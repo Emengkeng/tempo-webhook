@@ -102,6 +102,14 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Start webhook processor (processes matched events)
+    let processor_state = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = start_webhook_processor(processor_state).await {
+            error!("Webhook processor error: {}", e);
+        }
+    });
+
     // Build API server
     let app = routes::create_router(state.clone());
 
@@ -147,6 +155,39 @@ async fn start_indexer_services(state: Arc<AppState>) -> Result<()> {
 async fn start_webhook_dispatcher(state: Arc<AppState>) -> Result<()> {
     info!("Starting webhook dispatcher");
     services::dispatcher::start_dispatcher(state).await
+}
+
+async fn start_webhook_processor(state: Arc<AppState>) -> Result<()> {
+    info!("Starting webhook processor");
+    
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+    
+    loop {
+        interval.tick().await;
+        
+        // Get the latest indexed block for each network
+        if state.config.enable_mainnet {
+            if let Ok(Some(latest_block)) = crate::models::IndexedBlock::get_latest(&state.db).await {
+                let _ = services::dispatcher::process_block_webhooks(
+                    state.clone(),
+                    latest_block.block_number,
+                    "mainnet",
+                )
+                .await;
+            }
+        }
+        
+        if state.config.enable_testnet {
+            if let Ok(Some(latest_block)) = crate::models::IndexedBlock::get_latest(&state.db).await {
+                let _ = services::dispatcher::process_block_webhooks(
+                    state.clone(),
+                    latest_block.block_number,
+                    "testnet",
+                )
+                .await;
+            }
+        }
+    }
 }
 
 async fn shutdown_signal() {

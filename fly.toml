@@ -1,4 +1,4 @@
-app = "eventop-webhooks"
+app = "tempo-webhooks"
 primary_region = "sjc"
 
 [build]
@@ -6,7 +6,7 @@ primary_region = "sjc"
 
 [env]
   PORT = "8080"
-  RUST_LOG = "info,eventop_webhooks=debug"
+  RUST_LOG = "info,tempo_webhooks=debug"
 
 [[services]]
   internal_port = 8080

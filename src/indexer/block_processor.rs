@@ -88,6 +88,9 @@ impl BlockProcessor {
                 "[{}] Indexed {} events from block #{}",
                 self.network, event_count, block.number
             );
+            
+            // Note: Webhook processing will be triggered by a separate background task
+            // that polls for new events and processes them via NATS queue
         }
 
         Ok(())
