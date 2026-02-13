@@ -2,7 +2,7 @@ use axum::{
     extract::{Query, State},
     Extension, Json,
 };
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -119,7 +119,7 @@ pub async fn get_usage_stats(
         NaiveDate::parse_from_str(&start, "%Y-%m-%d")
             .map_err(|_| crate::error::AppError::BadRequest("Invalid start_date format".to_string()))?
     } else {
-        NaiveDate::from_ymd_opt(end_date.year(), end_date.month(), 1).unwrap()
+        NaiveDate::from_ymd_opt(end_date.year() as i32, end_date.month(), 1).unwrap()
     };
 
     // Get subscription plan
@@ -151,7 +151,7 @@ pub async fn get_usage_stats(
 
     let webhook_deliveries = usage_data.total_webhooks.unwrap_or(0);
     let api_requests = usage_data.total_api_requests.unwrap_or(0);
-    let active_subscriptions = usage_data.max_subscriptions.unwrap_or(0);
+    let active_subscriptions = usage_data.max_subscriptions.unwrap_or(0) as i64;
 
     // Calculate quota based on plan
     let (quota_webhooks, overage_rate) = match plan_tier.as_str() {
