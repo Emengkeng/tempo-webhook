@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[derive(Clone, Debug)]
 pub struct AuthenticatedUser {
     pub user: User,
     pub api_key: ApiKey,
