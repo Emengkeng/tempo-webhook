@@ -3,8 +3,9 @@ use alloy::{
     primitives::{Address, FixedBytes, U256},
     providers::{Provider, ProviderBuilder},
     rpc::types::{Filter, Log},
-    transports::http::{Client, Http},
+    transports::http::Http,
 };
+use reqwest::Client;
 use sqlx::PgPool;
 use std::str::FromStr;
 use tracing::info;
@@ -29,8 +30,8 @@ impl EventIndexer {
             std::env::var("TEMPO_TESTNET_HTTP").unwrap()
         };
 
-        let http = Http::<Client>::new(http_url.parse().unwrap());
-        let provider = ProviderBuilder::new().on_http(http);
+        let url = http_url.parse().expect("Invalid HTTP URL");
+        let provider = ProviderBuilder::new().on_http(url);
 
         Self {
             db,
