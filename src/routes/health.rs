@@ -23,7 +23,7 @@ pub async fn health_check(State(state): State<Arc<AppState>>) -> Json<Value> {
     checks.push(("redis", redis_healthy));
 
     // Check NATS
-    let nats_healthy = !state.nats.is_closed();
+    let nats_healthy = state.nats.publish("health.check", "ping".into()).await.is_ok();
     checks.push(("nats", nats_healthy));
 
     let all_healthy = checks.iter().all(|(_, status)| *status);
