@@ -71,6 +71,7 @@ governor = "0.6"
 
 # Password hashing
 bcrypt = "0.15"
+sentry = "0.46.2"
 
 [dev-dependencies]
 tokio-test = "0.4"
