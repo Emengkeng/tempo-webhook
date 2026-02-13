@@ -243,7 +243,7 @@ fn verify_admin_access(auth: &AuthenticatedUser) -> AppResult<()> {
     }
 
     // TODO: Add additional admin verification
-    // For production, you might want a separate admin_users table
+    // might want a separate admin_users table
     // or check against a list of admin emails/organizations
 
     Ok(())

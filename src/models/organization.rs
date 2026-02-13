@@ -14,7 +14,7 @@ pub struct Organization {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, FromRow)]
 pub struct SubscriptionPlan {
     pub id: Uuid,
     pub organization_id: Uuid,
@@ -26,6 +26,38 @@ pub struct SubscriptionPlan {
     pub current_period_end: Option<DateTime<Utc>>,
     pub polar_subscription_id: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+// Serializable version for API responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionPlanResponse {
+    pub id: Uuid,
+    pub organization_id: Uuid,
+    pub plan_tier: String,
+    pub billing_cycle: Option<String>,
+    pub price_usd: Option<String>, // Convert BigDecimal to String
+    pub status: String,
+    pub current_period_start: Option<DateTime<Utc>>,
+    pub current_period_end: Option<DateTime<Utc>>,
+    pub polar_subscription_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<SubscriptionPlan> for SubscriptionPlanResponse {
+    fn from(plan: SubscriptionPlan) -> Self {
+        Self {
+            id: plan.id,
+            organization_id: plan.organization_id,
+            plan_tier: plan.plan_tier,
+            billing_cycle: plan.billing_cycle,
+            price_usd: plan.price_usd.map(|bd| bd.to_string()),
+            status: plan.status,
+            current_period_start: plan.current_period_start,
+            current_period_end: plan.current_period_end,
+            polar_subscription_id: plan.polar_subscription_id,
+            created_at: plan.created_at,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
