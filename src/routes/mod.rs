@@ -50,10 +50,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         .route("/api/v1/api-keys/:id", delete(auth::delete_api_key))
         // Admin endpoints (require admin role)
-        .route("/api/v1/admin/organizations", get(admin::list_all_organizations))
-        .route("/api/v1/admin/organizations/:id/plan", put(admin::set_custom_plan))
-        .route("/api/v1/admin/organizations/:id/status", patch(admin::toggle_organization_status))
-        .route("/api/v1/admin/custom-limits", get(admin::get_custom_limits))
+        // .route("/api/v1/admin/organizations", get(admin::list_all_organizations))
+        // .route("/api/v1/admin/organizations/:id/plan", put(admin::set_custom_plan))
+        // .route("/api/v1/admin/organizations/:id/status", patch(admin::toggle_organization_status))
+        // .route("/api/v1/admin/custom-limits", get(admin::get_custom_limits))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::utils::auth::authenticate_api_key_with_state,
