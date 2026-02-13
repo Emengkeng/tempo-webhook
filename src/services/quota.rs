@@ -40,7 +40,7 @@ impl PlanLimits {
                 can_use_testnet: true,
                 max_filters_per_subscription: 10,
             },
-            "enterprise" => Self {
+            "enterprise" | "custom" => Self {
                 max_subscriptions: i64::MAX,
                 max_webhook_deliveries: i64::MAX,
                 max_api_requests_per_minute: 10_000,
@@ -51,6 +51,60 @@ impl PlanLimits {
             _ => Self::for_tier("free"),
         }
     }
+
+    /// Get plan limits with custom overrides if they exist
+    pub async fn for_organization(
+        db: &PgPool,
+        organization_id: Uuid,
+        plan_tier: &str,
+    ) -> Result<Self, sqlx::Error> {
+        // Start with default limits for tier
+        let mut limits = Self::for_tier(plan_tier);
+
+        // Check for custom limits
+        let custom = sqlx::query!(
+            "SELECT limits FROM custom_plan_limits WHERE organization_id = $1",
+            organization_id
+        )
+        .fetch_optional(db)
+        .await?;
+
+        if let Some(row) = custom {
+            // Parse custom limits and override defaults
+            if let Ok(custom_limits) = serde_json::from_value::<CustomLimits>(row.limits) {
+                if let Some(max_subs) = custom_limits.max_subscriptions {
+                    limits.max_subscriptions = max_subs;
+                }
+                if let Some(max_webhooks) = custom_limits.max_webhook_deliveries {
+                    limits.max_webhook_deliveries = max_webhooks;
+                }
+                if let Some(max_api) = custom_limits.max_api_requests_per_minute {
+                    limits.max_api_requests_per_minute = max_api;
+                }
+                if let Some(mainnet) = custom_limits.can_use_mainnet {
+                    limits.can_use_mainnet = mainnet;
+                }
+                if let Some(testnet) = custom_limits.can_use_testnet {
+                    limits.can_use_testnet = testnet;
+                }
+                if let Some(max_filters) = custom_limits.max_filters_per_subscription {
+                    limits.max_filters_per_subscription = max_filters;
+                }
+            }
+        }
+
+        Ok(limits)
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct CustomLimits {
+    pub max_subscriptions: Option<i64>,
+    pub max_webhook_deliveries: Option<i64>,
+    pub max_api_requests_per_minute: Option<i64>,
+    pub can_use_mainnet: Option<bool>,
+    pub can_use_testnet: Option<bool>,
+    pub max_filters_per_subscription: Option<i64>,
 }
 
 pub async fn check_subscription_quota(
@@ -85,7 +139,8 @@ pub async fn check_subscription_quota(
         )));
     }
 
-    let limits = PlanLimits::for_tier(&plan.plan_tier);
+    // Get effective limits (checks custom quotas first, then plan defaults)
+    let limits = crate::routes::admin::get_effective_limits(db, organization_id).await?;
 
     // Check network access
     if network == "mainnet" && !limits.can_use_mainnet {
@@ -106,8 +161,8 @@ pub async fn check_subscription_quota(
 
     if current_count >= limits.max_subscriptions {
         return Err(AppError::BadRequest(format!(
-            "Subscription limit reached. Your {} plan allows {} subscriptions. Please upgrade or remove inactive subscriptions.",
-            plan.plan_tier, limits.max_subscriptions
+            "Subscription limit reached. Your plan allows {} subscriptions. Please upgrade or remove inactive subscriptions.",
+            limits.max_subscriptions
         )));
     }
 
@@ -136,7 +191,8 @@ pub async fn check_webhook_quota(
             }
         });
 
-    let limits = PlanLimits::for_tier(&plan.plan_tier);
+    // Get effective limits (includes custom quotas)
+    let limits = crate::routes::admin::get_effective_limits(db, organization_id).await?;
 
     // Get current period usage
     let period_start = plan
@@ -190,7 +246,8 @@ pub async fn check_filter_quota(
             }
         });
 
-    let limits = PlanLimits::for_tier(&plan.plan_tier);
+    // Get effective limits (includes custom quotas)
+    let limits = crate::routes::admin::get_effective_limits(db, organization_id).await?;
 
     if filter_count as i64 > limits.max_filters_per_subscription {
         return Err(AppError::BadRequest(format!(
@@ -226,7 +283,8 @@ pub async fn check_api_rate_limit(
             }
         });
 
-    let limits = PlanLimits::for_tier(&plan.plan_tier);
+    // Get effective limits (includes custom quotas)
+    let limits = crate::routes::admin::get_effective_limits(db, organization_id).await?;
 
     let mut conn = redis
         .get_multiplexed_async_connection()

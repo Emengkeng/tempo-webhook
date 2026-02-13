@@ -82,19 +82,19 @@ impl EventIndexer {
         let from_address = format!("0x{}", hex::encode(&log.topics()[1].as_slice()[12..]));
         let to_address = format!("0x{}", hex::encode(&log.topics()[2].as_slice()[12..]));
 
-        let amount_bytes: [u8; 32] = log.data().data[0..32]
+        let amount_bytes: [u8; 32] = log.data.data[0..32]
             .try_into()
             .map_err(|_| anyhow::anyhow!("Invalid amount data"))?;
         let amount = U256::from_be_bytes(amount_bytes);
 
-        let memo = if log.data().data.len() > 64 {
-            let memo_length_bytes: [u8; 32] = log.data().data[32..64]
+        let memo = if log.data.data.len() > 64 {
+            let memo_length_bytes: [u8; 32] = log.data.data[32..64]
                 .try_into()
                 .map_err(|_| anyhow::anyhow!("Invalid memo length"))?;
             let memo_length = U256::from_be_bytes(memo_length_bytes).to::<usize>();
 
-            if log.data().data.len() >= 64 + memo_length {
-                let memo_bytes = &log.data().data[64..64 + memo_length];
+            if log.data.data.len() >= 64 + memo_length {
+                let memo_bytes = &log.data.data[64..64 + memo_length];
                 Some(String::from_utf8_lossy(memo_bytes).to_string())
             } else {
                 None
@@ -108,7 +108,7 @@ impl EventIndexer {
             block_number as i64,
             format!("{:?}", log.transaction_hash.unwrap()),
             log.log_index.unwrap_or(0) as i32,
-            format!("{:?}", log.address()),
+            format!("{:?}", log.address),
             from_address,
             to_address,
             amount.to_string(),
