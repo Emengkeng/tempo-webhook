@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Blockchain
-alloy = { version = "0.6", features = ["providers", "rpc-types", "transports", "node-bindings", "contract", "signers"] }
+alloy = { version = "0.6", features = ["full"] }
 
 # Web server
 axum = { version = "0.7", features = ["macros"] }

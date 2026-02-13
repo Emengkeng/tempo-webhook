@@ -1,7 +1,8 @@
 use alloy::{
     primitives::BlockNumber,
-    providers::{Provider, ProviderBuilder, WsConnect},
-    rpc::types::Block,
+    providers::{Provider, ProviderBuilder},
+    transports::ws::WsConnect,
+    rpc::types::Header,
 };
 use futures_util::StreamExt;
 use std::time::Duration;
@@ -75,8 +76,8 @@ impl WebSocketManager {
 
         info!("Subscribed to new blocks for {}", self.network);
 
-        while let Some(block) = stream.next().await {
-            if let Err(e) = self.handle_block(block, processor, indexer).await {
+        while let Some(header) = stream.next().await {
+            if let Err(e) = self.handle_block(header, processor, indexer).await {
                 error!("Error handling block: {}", e);
             }
         }
@@ -86,13 +87,13 @@ impl WebSocketManager {
 
     async fn handle_block(
         &self,
-        block: Block,
+        header: Header,
         processor: &mut BlockProcessor,
         indexer: &EventIndexer,
     ) -> anyhow::Result<()> {
-        let block_number = block.header.number.ok_or("Block number missing")?;
-        let block_hash = format!("{:?}", block.header.hash.ok_or("Block hash missing")?);
-        let timestamp = block.header.timestamp as i64;
+        let block_number = header.number;
+        let block_hash = format!("{:?}", header.hash);
+        let timestamp = header.timestamp as i64;
 
         info!(
             "[{}] Received block #{} (hash: {})",
