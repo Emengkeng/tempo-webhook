@@ -118,7 +118,7 @@ pub async fn register(
     .await?;
 
     // Create default API key
-    let (api_key_str, key_hash) = generate_api_key("tempo_live");
+    let (api_key_str, key_hash) = generate_api_key("sdk_live");
     let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
 
     let api_key = ApiKey::create(
@@ -245,7 +245,7 @@ pub async fn create_api_key(
     Json(payload): Json<CreateApiKeyRequest>,
 ) -> AppResult<(StatusCode, Json<ApiKeyResponse>)> {
     // Generate API key
-    let (api_key_str, key_hash) = generate_api_key("tempo_live");
+    let (api_key_str, key_hash) = generate_api_key("sdk_live");
     let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
 
     // Calculate expiration
