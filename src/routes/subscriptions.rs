@@ -47,8 +47,24 @@ pub async fn create_subscription(
     validate_ethereum_address(&payload.address)?;
     validate_url(&payload.webhook_url)?;
 
-    // Validate filters
+    // Check subscription quota BEFORE creating
+    crate::services::quota::check_subscription_quota(
+        &state.db,
+        auth.api_key.organization_id,
+        &payload.network,
+    )
+    .await?;
+
+    // Validate filters and check filter quota
     if let Some(ref filters) = payload.filters {
+        // Check filter count against plan limits
+        crate::services::quota::check_filter_quota(
+            filters.len(),
+            &state.db,
+            auth.api_key.organization_id,
+        )
+        .await?;
+
         for filter in filters {
             validate_filter_type(&filter.filter_type)?;
             

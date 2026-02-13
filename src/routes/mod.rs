@@ -3,6 +3,7 @@ pub mod subscriptions;
 pub mod webhooks;
 pub mod polar_webhooks;
 pub mod auth;
+pub mod plans;
 
 use axum::{
     middleware,
@@ -38,6 +39,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Webhooks
         .route("/api/v1/webhooks/logs", get(webhooks::list_webhook_logs))
         .route("/api/v1/usage", get(webhooks::get_usage_stats))
+        // Plans & Quotas
+        .route("/api/v1/plan", get(plans::get_plan_info))
+        .route("/api/v1/quota/warnings", get(plans::check_quota_warnings))
         // API Keys
         .route(
             "/api/v1/api-keys",
@@ -45,8 +49,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         .route("/api/v1/api-keys/:id", delete(auth::delete_api_key))
         .layer(middleware::from_fn_with_state(
-            Arc::new(state.db.clone()),
-            crate::utils::auth::authenticate_api_key,
+            state.clone(),
+            crate::utils::auth::authenticate_api_key_with_state,
         ));
 
     // Combine routes

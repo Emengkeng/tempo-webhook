@@ -51,6 +51,24 @@ struct WebhookDeliveryJob {
 async fn deliver_webhook(state: Arc<AppState>, job: WebhookDeliveryJob) -> anyhow::Result<()> {
     let start_time = Instant::now();
     
+    // Check webhook quota before delivery
+    if let Err(e) = crate::services::quota::check_webhook_quota(&state.db, job.organization_id).await {
+        tracing::warn!("Webhook quota exceeded for org {}: {}", job.organization_id, e);
+        
+        // Mark as failed due to quota
+        WebhookLog::update_delivery_status(
+            &state.db,
+            job.webhook_log_id,
+            "failed".to_string(),
+            None,
+            Some(format!("Quota exceeded: {}", e)),
+            None,
+        )
+        .await?;
+        
+        return Ok(()); // Don't retry if quota exceeded
+    }
+    
     let mut backoff = ExponentialBackoff {
         current_interval: Duration::from_secs(1),
         initial_interval: Duration::from_secs(1),
