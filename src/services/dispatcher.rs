@@ -146,7 +146,7 @@ async fn deliver_webhook(state: Arc<AppState>, job: WebhookDeliveryJob) -> anyho
 async fn attempt_delivery(
     state: &AppState,
     job: &WebhookDeliveryJob,
-) -> Result<(i32, i64), Box<dyn std::error::Error>> {
+) -> anyhow::Result<(i32, i64)> {
     let start = Instant::now();
     
     // Generate HMAC signature
@@ -173,11 +173,11 @@ async fn attempt_delivery(
         Ok((status_code, latency_ms))
     } else {
         let error_body = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-        Err(format!("HTTP {}: {}", status_code, error_body).into())
+        Err(anyhow::anyhow!("HTTP {}: {}", status_code, error_body))
     }
 }
 
-fn is_retryable_error(error: &Box<dyn std::error::Error>) -> bool {
+fn is_retryable_error(error: &anyhow::Error) -> bool {
     let error_str = error.to_string().to_lowercase();
     
     // Retry on network errors and 5xx status codes
