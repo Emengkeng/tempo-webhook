@@ -1,6 +1,9 @@
 use crate::models::{IndexedBlock, WebhookLog};
+use crate::services::{matcher, dispatcher};
+use crate::state::AppState;
 use sqlx::PgPool;
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use super::event_indexer::EventIndexer;
@@ -17,15 +20,17 @@ pub struct BlockProcessor {
     confirmation_blocks: u64,
     pending_blocks: VecDeque<PendingBlock>,
     network: String,
+    state: Arc<AppState>,
 }
 
 impl BlockProcessor {
-    pub fn new(db: PgPool, confirmation_blocks: u64, network: String) -> Self {
+    pub fn new(db: PgPool, confirmation_blocks: u64, network: String, state: Arc<AppState>) -> Self {
         Self {
             db,
             confirmation_blocks,
             pending_blocks: VecDeque::new(),
             network,
+            state,
         }
     }
 
@@ -89,8 +94,75 @@ impl BlockProcessor {
                 self.network, event_count, block.number
             );
             
-            // Note: Webhook processing will be triggered by a separate background task
-            // that polls for new events and processes them via NATS queue
+            self.process_webhooks(block.number as i64).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn process_webhooks(&self, block_number: i64) -> anyhow::Result<()> {
+        info!("[{}] Processing webhooks for block #{}", self.network, block_number);
+        
+        // Match events to subscriptions
+        let matches = matcher::match_transfer_events(
+            &self.db,
+            block_number,
+            &self.network,
+        ).await?;
+
+        if matches.is_empty() {
+            info!("[{}] No webhook matches found for block #{}", self.network, block_number);
+            return Ok(());
+        }
+
+        info!(
+            "[{}] Found {} webhook matches for block #{}",
+            self.network,
+            matches.len(),
+            block_number
+        );
+
+        // Enqueue webhooks for delivery
+        for matched in matches {
+            info!(
+                "[{}] Match found - Subscription: {} | Token: {} | Amount: {}",
+                self.network,
+                matched.subscription_id,
+                matched.event.token_address,
+                matched.event.amount
+            );
+            // Create webhook log
+            let payload = matched.event.to_webhook_payload(&self.network);
+            let payload_json = serde_json::to_value(&payload)?;
+
+            let webhook_log = WebhookLog::create(
+                &self.db,
+                matched.subscription_id,
+                matched.organization_id,
+                matched.event.tx_hash.clone(),
+                matched.event.block_number as i32,
+                payload_json.clone(),
+            )
+            .await?;
+
+            // Enqueue for delivery
+            let job = dispatcher::WebhookDeliveryJob {
+                webhook_log_id: webhook_log.id,
+                subscription_id: matched.subscription_id,
+                organization_id: matched.organization_id,
+                webhook_url: matched.webhook_url,
+                webhook_secret: matched.webhook_secret,
+                payload: payload_json,
+            };
+
+            dispatcher::enqueue_webhook(&self.state, job).await?;
+            
+            info!(
+                "[{}] Enqueued webhook for subscription {} (tx: {})",
+                self.network,
+                matched.subscription_id,
+                &matched.event.tx_hash[..10]
+            );
         }
 
         Ok(())

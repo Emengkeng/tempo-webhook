@@ -32,11 +32,14 @@ async fn start_network_indexer(
     network: String,
 ) -> anyhow::Result<()> {
     let ws_manager = websocket::WebSocketManager::new(ws_url, http_url, network.clone());
+    
     let processor = block_processor::BlockProcessor::new(
         state.db.clone(),
         state.config.confirmation_blocks,
         network.clone(),
+        state.clone(),
     );
+    
     let indexer = event_indexer::EventIndexer::new(
         state.db.clone(),
         network.clone(),

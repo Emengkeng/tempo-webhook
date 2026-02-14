@@ -41,42 +41,88 @@ impl EventIndexer {
     }
 
     pub async fn index_block(&self, block_number: u64) -> anyhow::Result<usize> {
-        let monitored_tokens =
+        // Get monitored WALLETS, not tokens
+        let monitored_wallets =
             Subscription::get_active_monitored_addresses(&self.db, &self.network).await?;
 
-        if monitored_tokens.is_empty() {
+        if monitored_wallets.is_empty() {
             return Ok(0);
         }
 
         info!(
-            "[{}] Indexing {} tokens in block #{}",
+            "[{}] 👁️ Monitoring {} wallets in block #{}",
             self.network,
-            monitored_tokens.len(),
+            monitored_wallets.len(),
             block_number
         );
 
-        let addresses: Vec<Address> = monitored_tokens
-            .iter()
-            .filter_map(|addr| Address::from_str(addr).ok())
-            .collect();
+        info!(
+            "[{}] 👛 Monitored wallets: {:?}",
+            self.network,
+            monitored_wallets.iter().map(|w| &w[..10]).collect::<Vec<_>>()
+        );
 
-        if addresses.is_empty() {
-            return Ok(0);
-        }
-
+        //  Get ALL transfers in this block, not just from specific addresses
         let filter = Filter::new()
             .from_block(block_number)
             .to_block(block_number)
-            .address(addresses)
             .event_signature(TRANSFER_SIGNATURE);
 
+        info!("[{}] 🔍 Fetching ALL transfers in block #{}", self.network, block_number);
+        
         let logs = self.provider.get_logs(&filter).await?;
 
+        info!(
+            "[{}] 📦 Block #{} has {} total transfer events",
+            self.network, block_number, logs.len()
+        );
+
+        // Filter for only transfers involving monitored wallets
+        let mut relevant_events = 0;
+        
         for log in &logs {
-            self.store_transfer_event(log, block_number).await?;
+            if log.topics().len() < 3 {
+                continue;
+            }
+
+            // Extract from and to addresses from topics
+            let from_address = format!("0x{}", hex::encode(&log.topics()[1].as_slice()[12..]));
+            let to_address = format!("0x{}", hex::encode(&log.topics()[2].as_slice()[12..]));
+
+            // Check if this transfer involves any monitored wallet
+            let is_relevant = monitored_wallets.iter().any(|wallet| {
+                wallet.eq_ignore_ascii_case(&from_address) || 
+                wallet.eq_ignore_ascii_case(&to_address)
+            });
+
+            if is_relevant {
+                info!(
+                    "[{}] ✅ RELEVANT: {:?} | {} → {} | Token: {:?}",
+                    self.network,
+                    log.transaction_hash,
+                    &from_address[..10],
+                    &to_address[..10],
+                    log.address()
+                );
+                
+                self.store_transfer_event(log, block_number).await?;
+                relevant_events += 1;
+            }
         }
 
-        Ok(logs.len())
+        if relevant_events == 0 {
+            info!(
+                "[{}] 😴 No transfers for monitored wallets in block #{}",
+                self.network, block_number
+            );
+        } else {
+            info!(
+                "[{}] 🎯 Found {} relevant transfers in block #{}",
+                self.network, relevant_events, block_number
+            );
+        }
+
+        Ok(relevant_events)
     }
 
     async fn store_transfer_event(&self, log: &Log, block_number: u64) -> anyhow::Result<()> {
@@ -103,6 +149,16 @@ impl EventIndexer {
         } else {
             None
         };
+
+        info!(
+            "[{}] 💰 Storing: {} → {} | Amount: {} | Token: {:?} | Memo: {:?}",
+            self.network,
+            &from_address[..10],
+            &to_address[..10],
+            amount,
+            log.address(),
+            memo
+        );
 
         TransferEvent::create(
             &self.db,

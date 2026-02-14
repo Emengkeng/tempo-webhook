@@ -39,13 +39,13 @@ pub async fn start_dispatcher(state: Arc<AppState>) -> anyhow::Result<()> {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct WebhookDeliveryJob {
-    webhook_log_id: uuid::Uuid,
-    subscription_id: uuid::Uuid,
-    organization_id: uuid::Uuid,
-    webhook_url: String,
-    webhook_secret: String,
-    payload: serde_json::Value,
+pub struct WebhookDeliveryJob {
+    pub webhook_log_id: uuid::Uuid,
+    pub subscription_id: uuid::Uuid,
+    pub organization_id: uuid::Uuid,
+    pub webhook_url: String,
+    pub webhook_secret: String,
+    pub payload: serde_json::Value,
 }
 
 async fn deliver_webhook(state: Arc<AppState>, job: WebhookDeliveryJob) -> anyhow::Result<()> {

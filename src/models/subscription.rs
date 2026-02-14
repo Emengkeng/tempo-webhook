@@ -15,6 +15,7 @@ pub struct Subscription {
     pub webhook_url: String,
     #[serde(skip_serializing)]
     pub webhook_secret: String,
+    pub subscription_type: String, // WALLET, TOKEN, CONTRACT
     pub active: bool,
     pub confirmation_blocks: i32,
     pub created_at: DateTime<Utc>,
@@ -85,7 +86,7 @@ impl Subscription {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, active, 
+                address, webhook_url, webhook_secret, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             "#,
             org_id,
@@ -111,7 +112,7 @@ impl Subscription {
             r#"
             SELECT 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, active, 
+                address, webhook_url, webhook_secret, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             FROM subscriptions 
             WHERE id = $1 AND organization_id = $2
@@ -134,7 +135,7 @@ impl Subscription {
             r#"
             SELECT 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, active, 
+                address, webhook_url, webhook_secret, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             FROM subscriptions 
             WHERE organization_id = $1
