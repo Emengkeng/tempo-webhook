@@ -79,20 +79,20 @@ impl BlockProcessor {
         block: PendingBlock,
         indexer: &EventIndexer,
     ) -> anyhow::Result<()> {
-        info!(
-            "[{}] Indexing confirmed block #{}",
-            self.network, block.number
-        );
+        // info!(
+        //     "[{}] Indexing confirmed block #{}",
+        //     self.network, block.number
+        // );
 
         IndexedBlock::create(&self.db, block.number as i64, block.hash, block.timestamp).await?;
 
         let event_count = indexer.index_block(block.number).await?;
 
         if event_count > 0 {
-            info!(
-                "[{}] Indexed {} events from block #{}",
-                self.network, event_count, block.number
-            );
+            // info!(
+            //     "[{}] Indexed {} events from block #{}",
+            //     self.network, event_count, block.number
+            // );
             
             self.process_webhooks(block.number as i64).await?;
         }
@@ -101,7 +101,7 @@ impl BlockProcessor {
     }
 
     async fn process_webhooks(&self, block_number: i64) -> anyhow::Result<()> {
-        info!("[{}] Processing webhooks for block #{}", self.network, block_number);
+        // info!("[{}] Processing webhooks for block #{}", self.network, block_number);
         
         // Match events to subscriptions
         let matches = matcher::match_transfer_events(
@@ -111,7 +111,7 @@ impl BlockProcessor {
         ).await?;
 
         if matches.is_empty() {
-            info!("[{}] No webhook matches found for block #{}", self.network, block_number);
+            // info!("[{}] No webhook matches found for block #{}", self.network, block_number);
             return Ok(());
         }
 
@@ -124,13 +124,13 @@ impl BlockProcessor {
 
         // Enqueue webhooks for delivery
         for matched in matches {
-            info!(
-                "[{}] Match found - Subscription: {} | Token: {} | Amount: {}",
-                self.network,
-                matched.subscription_id,
-                matched.event.token_address,
-                matched.event.amount
-            );
+            // info!(
+            //     "[{}] Match found - Subscription: {} | Token: {} | Amount: {}",
+            //     self.network,
+            //     matched.subscription_id,
+            //     matched.event.token_address,
+            //     matched.event.amount
+            // );
             // Create webhook log
             let payload = matched.event.to_webhook_payload(&self.network);
             let payload_json = serde_json::to_value(&payload)?;

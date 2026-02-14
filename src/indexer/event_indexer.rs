@@ -49,18 +49,18 @@ impl EventIndexer {
             return Ok(0);
         }
 
-        info!(
-            "[{}] 👁️ Monitoring {} wallets in block #{}",
-            self.network,
-            monitored_wallets.len(),
-            block_number
-        );
+        // info!(
+        //     "[{}] 👁️ Monitoring {} wallets in block #{}",
+        //     self.network,
+        //     monitored_wallets.len(),
+        //     block_number
+        // );
 
-        info!(
-            "[{}] 👛 Monitored wallets: {:?}",
-            self.network,
-            monitored_wallets.iter().map(|w| &w[..10]).collect::<Vec<_>>()
-        );
+        // info!(
+        //     "[{}] 👛 Monitored wallets: {:?}",
+        //     self.network,
+        //     monitored_wallets.iter().map(|w| &w[..10]).collect::<Vec<_>>()
+        // );
 
         //  Get ALL transfers in this block, not just from specific addresses
         let filter = Filter::new()
@@ -68,14 +68,14 @@ impl EventIndexer {
             .to_block(block_number)
             .event_signature(TRANSFER_SIGNATURE);
 
-        info!("[{}] 🔍 Fetching ALL transfers in block #{}", self.network, block_number);
+        // info!("[{}] 🔍 Fetching ALL transfers in block #{}", self.network, block_number);
         
         let logs = self.provider.get_logs(&filter).await?;
 
-        info!(
-            "[{}] 📦 Block #{} has {} total transfer events",
-            self.network, block_number, logs.len()
-        );
+        // info!(
+        //     "[{}] 📦 Block #{} has {} total transfer events",
+        //     self.network, block_number, logs.len()
+        // );
 
         // Filter for only transfers involving monitored wallets
         let mut relevant_events = 0;
@@ -111,10 +111,10 @@ impl EventIndexer {
         }
 
         if relevant_events == 0 {
-            info!(
-                "[{}] 😴 No transfers for monitored wallets in block #{}",
-                self.network, block_number
-            );
+            // info!(
+            //     "[{}] 😴 No transfers for monitored wallets in block #{}",
+            //     self.network, block_number
+            // );
         } else {
             info!(
                 "[{}] 🎯 Found {} relevant transfers in block #{}",
