@@ -49,6 +49,12 @@ pub async fn authenticate_api_key_with_state(
         .await?
         .ok_or_else(|| AppError::Unauthorized("User not found".to_string()))?;
 
+    if !user.email_verified {
+        return Err(AppError::Unauthorized(
+            "Email not verified. Please verify your email to use the API.".to_string()
+        ));
+    }
+
     // Check organization is active
     let org = crate::models::Organization::get_by_id(&state.db, user.organization_id)
         .await?

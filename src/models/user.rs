@@ -14,6 +14,11 @@ pub struct User {
     pub role: String, // owner, admin, developer, viewer
     pub created_at: DateTime<Utc>,
     pub active: bool,
+    pub email_verified: bool,
+    #[serde(skip_serializing)]
+    pub email_verification_token: Option<String>,
+    #[serde(skip_serializing)]
+    pub email_verification_token_expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -61,7 +66,8 @@ impl User {
             r#"
             INSERT INTO users (organization_id, email, password_hash, full_name, role)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, organization_id, email, password_hash, full_name, role, created_at, active
+            RETURNING id, organization_id, email, password_hash, full_name, role, created_at, active,email_verified, email_verification_token,
+                      email_verification_token_expires_at
             "#,
             org_id,
             email,
@@ -73,10 +79,59 @@ impl User {
         .await
     }
 
+    pub async fn set_verification_token(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+        token: String,
+        expires_at: DateTime<Utc>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"
+            UPDATE users 
+            SET email_verification_token = $1,
+                email_verification_token_expires_at = $2
+            WHERE id = $3
+            "#,
+            token,
+            expires_at,
+            user_id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn verify_email(
+        pool: &sqlx::PgPool,
+        token: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users 
+            SET email_verified = true,
+                email_verification_token = NULL,
+                email_verification_token_expires_at = NULL
+            WHERE email_verification_token = $1
+              AND email_verification_token_expires_at > NOW()
+              AND active = true
+            RETURNING id, organization_id, email, password_hash, full_name, role,
+                      created_at, active, email_verified, email_verification_token,
+                      email_verification_token_expires_at
+            "#,
+            token
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn get_by_email(pool: &sqlx::PgPool, email: &str) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             User,
-            "SELECT * FROM users WHERE email = $1 AND active = true",
+            r#"SELECT id, organization_id, email, password_hash, full_name, role,
+                      created_at, active, email_verified, email_verification_token,
+                      email_verification_token_expires_at
+               FROM users WHERE email = $1 AND active = true"#,
             email
         )
         .fetch_optional(pool)
@@ -86,7 +141,10 @@ impl User {
     pub async fn get_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             User,
-            "SELECT * FROM users WHERE id = $1 AND active = true",
+            r#"SELECT id, organization_id, email, password_hash, full_name, role,
+                      created_at, active, email_verified, email_verification_token,
+                      email_verification_token_expires_at
+               FROM users WHERE id = $1 AND active = true"#,
             id
         )
         .fetch_optional(pool)

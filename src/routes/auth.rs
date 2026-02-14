@@ -21,7 +21,8 @@ use crate::utils::validation::validate_email;
 pub struct RegisterResponse {
     user: UserResponse,
     organization: Organization,
-    api_key: ApiKeyResponse,
+    // api_key: ApiKeyResponse,
+    message: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,6 +32,7 @@ pub struct UserResponse {
     full_name: Option<String>,
     role: String,
     created_at: chrono::DateTime<chrono::Utc>,
+    email_verified: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -101,7 +103,7 @@ pub async fn register(
     let user = User::create(
         &state.db,
         organization.id,
-        payload.email,
+        payload.email.clone(),
         password_hash,
         payload.full_name,
         "owner".to_string(),
@@ -118,20 +120,32 @@ pub async fn register(
     .await?;
 
     // Create default API key
-    let (api_key_str, key_hash) = generate_api_key("sdk_live");
-    let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
+    // let (api_key_str, key_hash) = generate_api_key("sdk_live");
+    // let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
 
-    let api_key = ApiKey::create(
-        &state.db,
-        organization.id,
-        user.id,
-        key_hash,
-        key_prefix,
-        Some("Default API Key".to_string()),
-        "both".to_string(),
-        None,
-    )
-    .await?;
+    // let api_key = ApiKey::create(
+    //     &state.db,
+    //     organization.id,
+    //     user.id,
+    //     key_hash,
+    //     key_prefix,
+    //     Some("Default API Key".to_string()),
+    //     "both".to_string(),
+    //     None,
+    // )
+    // .await?;
+
+    // Generate verification token
+    let verification_token = uuid::Uuid::new_v4().to_string();
+    let expires_at = Utc::now() + chrono::Duration::hours(24);
+    
+    User::set_verification_token(&state.db, user.id, verification_token.clone(), expires_at).await?;
+
+    // Send verification email
+    state
+        .email
+        .send_verification_email(&payload.email, &verification_token)
+        .await?;
 
     // Create free tier subscription plan
     crate::models::SubscriptionPlan::create_or_update(
@@ -152,17 +166,10 @@ pub async fn register(
                 full_name: user.full_name,
                 role: user.role,
                 created_at: user.created_at,
+                email_verified: user.email_verified,
             },
             organization,
-            api_key: ApiKeyResponse {
-                id: api_key.id,
-                key: api_key_str,
-                key_prefix: api_key.key_prefix,
-                name: api_key.name,
-                network: api_key.network,
-                created_at: api_key.created_at,
-                expires_at: api_key.expires_at,
-            },
+            message: "Registration successful! Please check your email to verify your account.".to_string(),
         }),
     ))
 }
@@ -233,6 +240,7 @@ pub async fn login(
             full_name: user.full_name,
             role: user.role,
             created_at: user.created_at,
+            email_verified: user.email_verified,
         },
         organization,
         api_keys: api_key_list,
@@ -325,5 +333,55 @@ pub async fn get_webhook_secret(
 
     Ok(Json(WebhookSecretResponse {
         webhook_secret: org.webhook_secret,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyEmailRequest {
+    token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VerifyEmailResponse {
+    message: String,
+    api_key: ApiKeyResponse,
+}
+
+pub async fn verify_email(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<VerifyEmailRequest>,
+) -> AppResult<Json<VerifyEmailResponse>> {
+    // Verify the token and update user
+    let user = User::verify_email(&state.db, &payload.token)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("Invalid or expired verification token".to_string()))?;
+
+    // Create default API key after email verification
+    let (api_key_str, key_hash) = generate_api_key("sdk_live");
+    let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
+
+    let api_key = ApiKey::create(
+        &state.db,
+        user.organization_id,
+        user.id,
+        key_hash,
+        key_prefix,
+        Some("Default API Key".to_string()),
+        "both".to_string(),
+        None,
+    )
+    .await?;
+
+    Ok(Json(VerifyEmailResponse {
+        message: "Email verified successfully!".to_string(),
+        api_key: ApiKeyResponse {
+            id: api_key.id,
+            key: api_key_str,
+            key_prefix: api_key.key_prefix,
+            name: api_key.name,
+            network: api_key.network,
+            created_at: api_key.created_at,
+            expires_at: api_key.expires_at,
+        },
     }))
 }

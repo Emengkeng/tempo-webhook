@@ -22,7 +22,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health::health_check))
         .route("/webhooks/polar", post(polar_webhooks::handle_polar_webhook))
         .route("/auth/register", post(auth::register))
-        .route("/auth/login", post(auth::login));
+        .route("/auth/login", post(auth::login))
+        .route("/auth/verify-email", post(auth::verify_email));
 
     // Protected API routes (require API key)
     let api_routes = Router::new()

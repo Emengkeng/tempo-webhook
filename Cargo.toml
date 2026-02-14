@@ -74,5 +74,8 @@ bcrypt = "0.15"
 sentry = "0.46.2"
 url = "2.5.8"
 
+# Email
+lettre = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "smtp-transport", "builder"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
