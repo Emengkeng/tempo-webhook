@@ -206,7 +206,7 @@ pub async fn process_block_webhooks(
 
     for matched in matches {
         // Create webhook log
-        let payload = matched.event.to_webhook_payload(network);
+        let payload = matched.event.to_webhook_payload(network, &matched.monitored_wallet);
         let payload_json = serde_json::to_value(&payload)?;
 
         let webhook_log = WebhookLog::create(

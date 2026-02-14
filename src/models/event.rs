@@ -15,6 +15,7 @@ pub struct TransferEvent {
     pub amount: String,
     pub memo: Option<String>,
     pub timestamp: i64,
+    pub direction: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -41,6 +42,8 @@ pub struct WebhookPayload {
     pub amount: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
     pub metadata: serde_json::Value,
 }
 
@@ -56,18 +59,19 @@ impl TransferEvent {
         amount: String,
         memo: Option<String>,
         timestamp: i64,
+        direction: Option<String>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             TransferEvent,
             r#"
             INSERT INTO transfer_events (
                 block_number, tx_hash, log_index, token_address, 
-                from_address, to_address, amount, memo, timestamp
+                from_address, to_address, direction, amount, memo, timestamp
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (tx_hash, log_index) DO NOTHING
             RETURNING id, block_number, tx_hash, log_index, token_address, 
-                      from_address, to_address, amount, memo, timestamp
+                      from_address, to_address, direction, amount, memo, timestamp
             "#,
             block_number,
             tx_hash,
@@ -75,6 +79,7 @@ impl TransferEvent {
             token_address,
             from_address,
             to_address,
+            direction,
             amount,
             memo,
             timestamp
@@ -109,7 +114,7 @@ impl TransferEvent {
         Ok(())
     }
 
-    pub fn to_webhook_payload(&self, network: &str) -> WebhookPayload {
+    pub fn to_webhook_payload(&self, network: &str, monitored_wallet: &str) -> WebhookPayload {
         WebhookPayload {
             event_type: if self.memo.is_some() {
                 "transfer_with_memo".to_string()
@@ -125,9 +130,26 @@ impl TransferEvent {
             token: self.token_address.clone(),
             amount: self.amount.clone(),
             memo: self.memo.clone(),
+            direction: Some(self.determine_direction(monitored_wallet)),
             metadata: serde_json::json!({
                 "logIndex": self.log_index
             }),
+        }
+    }
+
+    pub fn determine_direction(&self, monitored_wallet: &str) -> String {
+        let wallet_lower = monitored_wallet.to_lowercase();
+        let from_lower = self.from_address.to_lowercase();
+        let to_lower = self.to_address.to_lowercase();
+
+        if from_lower == wallet_lower && to_lower == wallet_lower {
+            "internal".to_string()  // Self-transfer
+        } else if to_lower == wallet_lower {
+            "incoming".to_string()  // Receiving
+        } else if from_lower == wallet_lower {
+            "outgoing".to_string()  // Sending
+        } else {
+            "unknown".to_string()   // Shouldn't happen
         }
     }
 }

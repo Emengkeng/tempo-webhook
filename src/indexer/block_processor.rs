@@ -132,7 +132,7 @@ impl BlockProcessor {
             //     matched.event.amount
             // );
             // Create webhook log
-            let payload = matched.event.to_webhook_payload(&self.network);
+            let payload = matched.event.to_webhook_payload(&self.network, &matched.monitored_wallet);
             let payload_json = serde_json::to_value(&payload)?;
 
             let webhook_log = WebhookLog::create(

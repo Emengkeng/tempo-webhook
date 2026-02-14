@@ -171,6 +171,7 @@ impl EventIndexer {
             amount.to_string(),
             memo,
             chrono::Utc::now().timestamp(),
+            None,
         )
         .await?;
 

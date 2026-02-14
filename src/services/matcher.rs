@@ -11,6 +11,7 @@ pub struct MatchedWebhook {
     pub webhook_url: String,
     pub webhook_secret: String,
     pub event: TransferEvent,
+    pub monitored_wallet: String,
 }
 
 pub async fn match_transfer_events(
@@ -51,7 +52,7 @@ pub async fn match_transfer_events(
                 filters.len()
             );
             
-            if apply_filters(&filters, &event) {
+            if apply_filters(&filters, &event, &sub.address) {
                 info!("[{}] ✅ Match! Wallet {} is involved in this transfer", network, &sub.address[..10]);
                 matched.push(MatchedWebhook {
                     subscription_id: sub.id,
@@ -59,6 +60,7 @@ pub async fn match_transfer_events(
                     webhook_url: sub.webhook_url.clone(),
                     webhook_secret: sub.webhook_secret.clone(),
                     event: event.clone(),
+                    monitored_wallet: sub.address.clone(),
                 });
             } else {
                 info!("[{}] ❌ Filters rejected this event", network);
@@ -105,7 +107,7 @@ async fn get_matching_subscriptions(
     Ok(result)
 }
 
-fn apply_filters(filters: &[Filter], event: &TransferEvent) -> bool {
+fn apply_filters(filters: &[Filter], event: &TransferEvent, monitored_wallet: &str) -> bool {
     if filters.is_empty() {
         info!("No filters to apply, accepting event");
         return true;
@@ -133,6 +135,14 @@ fn apply_filters(filters: &[Filter], event: &TransferEvent) -> bool {
                 let matches = event.token_address.to_lowercase() == filter.filter_value.to_lowercase();
                 info!("Filter token_address: {} == {} = {}", 
                     event.token_address, filter.filter_value, matches);
+                if !matches {
+                    return false;
+                }
+            }
+            "direction" => {  // ← ADD THIS NEW FILTER TYPE
+                let direction = event.determine_direction(monitored_wallet);
+                let matches = direction == filter.filter_value;
+                info!("Filter direction: {} == {} = {}", direction, filter.filter_value, matches);
                 if !matches {
                     return false;
                 }
