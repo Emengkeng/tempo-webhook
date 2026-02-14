@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+use crate::config::Config;
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct TransferEvent {
     pub id: Uuid,
@@ -346,20 +348,20 @@ pub struct TempoTokenlistService {
 }
 
 impl TempoTokenlistService {
-    pub fn new(db: sqlx::PgPool) -> Self {
+    pub fn new(db: sqlx::PgPool, config: &Config) -> Self {
         Self {
             db,
             http_client: reqwest::Client::new(),
-            api_base_url: "https://tokenlist.tempo.xyz".to_string(),
+            api_base_url: config.tempo_tokenlist_url.clone(),
         }
     }
 
     /// Get chain ID for network name
-    fn get_chain_id(network: &str) -> &str {
+    fn get_chain_id(network: &str, config: &Config) -> &str {
         match network {
-            "mainnet" => "42429",
-            "testnet" => "42431",
-            _ => "42431",
+            "mainnet" => config.tempo_mainnet_chain_id,
+            "testnet" => config.tempo_testnet_chain_id,
+            _ => config.tempo_testnet_chain_id,
         }
     }
 
@@ -368,6 +370,7 @@ impl TempoTokenlistService {
         &self,
         token_address: &str,
         network: &str,
+        config: &Config,
     ) -> anyhow::Result<TokenMetadata> {
         // First, try to get from cache
         if let Some(metadata) = self.get_from_cache(token_address, network).await? {
@@ -379,7 +382,7 @@ impl TempoTokenlistService {
         }
 
         // Cache miss or stale - fetch from Tempo Tokenlist API
-        self.fetch_and_cache(token_address, network).await
+        self.fetch_and_cache(token_address, network, config).await
     }
 
     async fn get_from_cache(
@@ -408,8 +411,9 @@ impl TempoTokenlistService {
         &self,
         token_address: &str,
         network: &str,
+        config: &Config,
     ) -> anyhow::Result<TokenMetadata> {
-        let chain_id = Self::get_chain_id(network);
+        let chain_id = Self::get_chain_id(network, config);
         
         // Fetch from Tempo Tokenlist API
         // Try by address: /asset/{chain_id}/{address}
@@ -470,8 +474,8 @@ impl TempoTokenlistService {
     }
 
     /// Prefetch and cache all tokens for a network
-    pub async fn prefetch_all_tokens(&self, network: &str) -> anyhow::Result<usize> {
-        let chain_id = Self::get_chain_id(network);
+    pub async fn prefetch_all_tokens(&self, network: &str, config: &Config,) -> anyhow::Result<usize> {
+        let chain_id = Self::get_chain_id(network, config);
         
         // Fetch complete token list
         let url = format!("{}/list/{}", self.api_base_url, chain_id);
