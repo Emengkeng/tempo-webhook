@@ -23,6 +23,9 @@ pub struct Config {
     pub tempo_mainnet_http: String,
     pub tempo_testnet_ws: String,
     pub tempo_testnet_http: String,
+    pub tempo_tokenlist_url: String,
+    pub tempo_mainnet_chain_id: i32,
+    pub tempo_testnet_chain_id: i32,
 
     // Server
     #[serde(default = "default_port")]
@@ -73,6 +76,13 @@ impl Config {
             tempo_mainnet_http: env::var("TEMPO_MAINNET_HTTP")?,
             tempo_testnet_ws: env::var("TEMPO_TESTNET_WS")?,
             tempo_testnet_http: env::var("TEMPO_TESTNET_HTTP")?,
+            tempo_tokenlist_url: env::var("TEMPO_TOKENLIST_URL")?,
+            tempo_mainnet_chain_id: env::var("TEMPO_MAINNET_CHAIN_ID")?
+                .parse()
+                .unwrap_or(42429),
+            tempo_testnet_chain_id: env::var("TEMPO_TESTNET_CHAIN_ID")?
+                .parse()
+                .unwrap_or(42431),
             port: env::var("PORT")
                 .ok()
                 .and_then(|s| s.parse().ok())
