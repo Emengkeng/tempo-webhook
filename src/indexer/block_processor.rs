@@ -122,7 +122,7 @@ impl BlockProcessor {
             block_number
         );
 
-        let tokenlist = TempoTokenlistService::new(self.db.clone());
+        let tokenlist = TempoTokenlistService::new(self.db.clone(), &self.state.config);
 
         // Enqueue webhooks for delivery
         for matched in matches {

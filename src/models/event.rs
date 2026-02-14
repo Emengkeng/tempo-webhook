@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::{config::Config, models::TokenMetadata};
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct TransferEvent {
