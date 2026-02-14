@@ -40,6 +40,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Webhooks
         .route("/api/v1/webhooks/logs", get(webhooks::list_webhook_logs))
         .route("/api/v1/usage", get(webhooks::get_usage_stats))
+        .route("/api/v1/webhook-secret", get(auth::get_webhook_secret))
         // Plans & Quotas
         .route("/api/v1/plan", get(plans::get_plan_info))
         .route("/api/v1/quota/warnings", get(plans::check_quota_warnings))

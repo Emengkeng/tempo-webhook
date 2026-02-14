@@ -82,11 +82,6 @@ pub async fn create_subscription(
         }
     }
 
-    // Generate webhook secret if not provided
-    let webhook_secret = payload
-        .webhook_secret
-        .unwrap_or_else(|| crate::utils::crypto::generate_webhook_secret());
-
     let confirmation_blocks = payload.confirmation_blocks.unwrap_or(1);
 
     // Create subscription
@@ -98,7 +93,6 @@ pub async fn create_subscription(
         payload.event_type,
         payload.address,
         payload.webhook_url,
-        webhook_secret.clone(),
         confirmation_blocks,
     )
     .await?;

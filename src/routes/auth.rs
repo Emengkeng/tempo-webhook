@@ -309,3 +309,21 @@ pub async fn delete_api_key(
     ApiKey::delete(&state.db, id, auth.api_key.organization_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[derive(Debug, Serialize)]
+pub struct WebhookSecretResponse {
+    webhook_secret: String,
+}
+
+pub async fn get_webhook_secret(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<AuthenticatedUser>,
+) -> AppResult<Json<WebhookSecretResponse>> {
+    let org = Organization::get_by_id(&state.db, auth.api_key.organization_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organization not found".to_string()))?;
+
+    Ok(Json(WebhookSecretResponse {
+        webhook_secret: org.webhook_secret,
+    }))
+}

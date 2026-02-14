@@ -1,4 +1,4 @@
-use crate::models::{Filter, Subscription, TransferEvent};
+use crate::models::{Filter, Organization, Subscription, TransferEvent};
 use regex::Regex;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -21,8 +21,6 @@ pub async fn match_transfer_events(
 ) -> anyhow::Result<Vec<MatchedWebhook>> {
     let events = TransferEvent::get_by_block(pool, block_number).await?;
 
-    // info!("[{}] 🔎 Matcher: Found {} events in block #{}", network, events.len(), block_number);
-
     let mut matched = Vec::new();
 
     for event in events {
@@ -43,7 +41,7 @@ pub async fn match_transfer_events(
             subscriptions.len()
         );
 
-        for (sub, filters) in subscriptions {
+        for (sub, filters, org) in subscriptions {
             info!(
                 "[{}] 🔎 Checking subscription {} (wallet: {}) with {} filters",
                 network,
@@ -58,7 +56,7 @@ pub async fn match_transfer_events(
                     subscription_id: sub.id,
                     organization_id: sub.organization_id,
                     webhook_url: sub.webhook_url.clone(),
-                    webhook_secret: sub.webhook_secret.clone(),
+                    webhook_secret: org.webhook_secret.clone(), // From organization
                     event: event.clone(),
                     monitored_wallet: sub.address.clone(),
                 });
@@ -75,13 +73,13 @@ async fn get_matching_subscriptions(
     pool: &PgPool,
     event: &TransferEvent,
     network: &str,
-) -> anyhow::Result<Vec<(Subscription, Vec<Filter>)>> {
+) -> anyhow::Result<Vec<(Subscription, Vec<Filter>, Organization)>> {
     let subscriptions = sqlx::query_as!(
         Subscription,
         r#"
         SELECT 
             id, organization_id, user_id, network, type as event_type, 
-            address, webhook_url, webhook_secret, subscription_type, active, 
+            address, webhook_url, subscription_type, active, 
             confirmation_blocks, created_at, updated_at
         FROM subscriptions
         WHERE active = true
@@ -101,7 +99,13 @@ async fn get_matching_subscriptions(
     let mut result = Vec::new();
     for sub in subscriptions {
         let filters = Filter::get_by_subscription(pool, sub.id).await?;
-        result.push((sub, filters));
+        
+        // Fetch organization to get webhook_secret
+        let org = Organization::get_by_id(pool, sub.organization_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Organization not found for subscription {}", sub.id))?;
+        
+        result.push((sub, filters, org));
     }
 
     Ok(result)
@@ -139,7 +143,7 @@ fn apply_filters(filters: &[Filter], event: &TransferEvent, monitored_wallet: &s
                     return false;
                 }
             }
-            "direction" => {  // ← ADD THIS NEW FILTER TYPE
+            "direction" => {
                 let direction = event.determine_direction(monitored_wallet);
                 let matches = direction == filter.filter_value;
                 info!("Filter direction: {} == {} = {}", direction, filter.filter_value, matches);

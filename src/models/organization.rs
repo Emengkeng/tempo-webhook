@@ -10,6 +10,7 @@ pub struct Organization {
     pub slug: String,
     pub org_type: String, // individual, team, enterprise
     pub owner_id: Uuid,
+    pub webhook_secret: String,
     pub created_at: DateTime<Utc>,
     pub active: bool,
 }
@@ -75,17 +76,20 @@ impl Organization {
         org_type: String,
         owner_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
+        let webhook_secret = crate::utils::crypto::generate_webhook_secret();
+
         sqlx::query_as!(
             Organization,
             r#"
-            INSERT INTO organizations (name, slug, org_type, owner_id)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, name, slug, org_type, owner_id, created_at, active
+            INSERT INTO organizations (name, slug, org_type, owner_id, webhook_secret)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
             "#,
             name,
             slug,
             org_type,
-            owner_id
+            owner_id,
+            webhook_secret
         )
         .fetch_one(pool)
         .await
@@ -94,7 +98,7 @@ impl Organization {
     pub async fn get_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Organization,
-            "SELECT * FROM organizations WHERE id = $1 AND active = true",
+            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active FROM organizations WHERE id = $1 AND active = true",
             id
         )
         .fetch_optional(pool)
@@ -107,7 +111,7 @@ impl Organization {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Organization,
-            "SELECT * FROM organizations WHERE slug = $1 AND active = true",
+            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active FROM organizations WHERE slug = $1 AND active = true",
             slug
         )
         .fetch_optional(pool)

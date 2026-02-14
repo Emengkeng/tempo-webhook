@@ -13,8 +13,8 @@ pub struct Subscription {
     pub event_type: String, // TRANSFER, TRANSFER_WITH_MEMO, etc.
     pub address: String, // Token or contract address
     pub webhook_url: String,
-    #[serde(skip_serializing)]
-    pub webhook_secret: String,
+    // #[serde(skip_serializing)]
+    // pub webhook_secret: String,
     pub subscription_type: String, // WALLET, TOKEN, CONTRACT
     pub active: bool,
     pub confirmation_blocks: i32,
@@ -38,7 +38,7 @@ pub struct CreateSubscriptionRequest {
     pub network: String,
     pub address: String,
     pub webhook_url: String,
-    pub webhook_secret: Option<String>,
+    // pub webhook_secret: Option<String>,
     pub filters: Option<Vec<FilterInput>>,
     pub confirmation_blocks: Option<i32>,
 }
@@ -73,7 +73,7 @@ impl Subscription {
         event_type: String,
         address: String,
         webhook_url: String,
-        webhook_secret: String,
+       // webhook_secret: String,
         confirmation_blocks: i32,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
@@ -81,12 +81,12 @@ impl Subscription {
             r#"
             INSERT INTO subscriptions (
                 organization_id, user_id, network, type, address, 
-                webhook_url, webhook_secret, confirmation_blocks
+                webhook_url, confirmation_blocks
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, subscription_type, active, 
+                address, webhook_url, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             "#,
             org_id,
@@ -95,7 +95,6 @@ impl Subscription {
             event_type,
             address,
             webhook_url,
-            webhook_secret,
             confirmation_blocks
         )
         .fetch_one(pool)
@@ -112,7 +111,7 @@ impl Subscription {
             r#"
             SELECT 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, subscription_type, active, 
+                address, webhook_url, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             FROM subscriptions 
             WHERE id = $1 AND organization_id = $2
@@ -135,7 +134,7 @@ impl Subscription {
             r#"
             SELECT 
                 id, organization_id, user_id, network, type as event_type, 
-                address, webhook_url, webhook_secret, subscription_type, active, 
+                address, webhook_url, subscription_type, active, 
                 confirmation_blocks, created_at, updated_at
             FROM subscriptions 
             WHERE organization_id = $1

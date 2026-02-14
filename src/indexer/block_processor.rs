@@ -104,7 +104,7 @@ impl BlockProcessor {
         // info!("[{}] Processing webhooks for block #{}", self.network, block_number);
         
         // Match events to subscriptions
-        let matches = matcher::match_transfer_events(
+        let matches: Vec<matcher::MatchedWebhook> = matcher::match_transfer_events(
             &self.db,
             block_number,
             &self.network,
