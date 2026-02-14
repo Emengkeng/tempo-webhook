@@ -1,4 +1,4 @@
-use crate::models::{IndexedBlock, WebhookLog};
+use crate::models::{IndexedBlock, TempoTokenlistService, WebhookLog};
 use crate::services::{matcher, dispatcher};
 use crate::state::AppState;
 use sqlx::PgPool;
@@ -94,13 +94,13 @@ impl BlockProcessor {
             //     self.network, event_count, block.number
             // );
             
-            self.process_webhooks(block.number as i64).await?;
+            self.process_webhooks(block.number as i64, &self.db).await?;
         }
 
         Ok(())
     }
 
-    async fn process_webhooks(&self, block_number: i64) -> anyhow::Result<()> {
+    async fn process_webhooks(&self, block_number: i64, db: &sqlx::PgPool) -> anyhow::Result<()> {
         // info!("[{}] Processing webhooks for block #{}", self.network, block_number);
         
         // Match events to subscriptions
@@ -122,6 +122,8 @@ impl BlockProcessor {
             block_number
         );
 
+        let tokenlist = TempoTokenlistService::new(self.db.clone());
+
         // Enqueue webhooks for delivery
         for matched in matches {
             // info!(
@@ -132,7 +134,7 @@ impl BlockProcessor {
             //     matched.event.amount
             // );
             // Create webhook log
-            let payload = matched.event.to_webhook_payload(&self.network, &matched.monitored_wallet);
+            let payload = matched.event.to_webhook_payload_with_db(&self.network, &matched.monitored_wallet, db).await;
             let payload_json = serde_json::to_value(&payload)?;
 
             let webhook_log = WebhookLog::create(
