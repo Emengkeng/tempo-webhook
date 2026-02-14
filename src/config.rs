@@ -27,6 +27,14 @@ pub struct Config {
     pub tempo_mainnet_chain_id: i32,
     pub tempo_testnet_chain_id: i32,
 
+    //SMTP
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub from_email: String,
+    pub base_url: String,
+
     // Server
     #[serde(default = "default_port")]
     pub port: u16,
@@ -83,6 +91,12 @@ impl Config {
             tempo_testnet_chain_id: env::var("TEMPO_TESTNET_CHAIN_ID")?
                 .parse()
                 .unwrap_or(42431),
+            smtp_host: env::var("SMTP_HOST")?,
+            smtp_port: env::var("SMTP_PORT")?.parse()?,
+            smtp_username: env::var("SMTP_USERNAME")?,
+            smtp_password: env::var("SMTP_PASSWORD")?,
+            from_email: env::var("FROM_EMAIL")?,
+            base_url: env::var("BASE_URL")?,
             port: env::var("PORT")
                 .ok()
                 .and_then(|s| s.parse().ok())

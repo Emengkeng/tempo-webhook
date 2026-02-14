@@ -16,6 +16,8 @@ mod utils;
 use config::Config;
 use state::AppState;
 
+use crate::services::EmailService;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -67,6 +69,17 @@ async fn main() -> Result<()> {
     let redis_conn = redis_client.get_multiplexed_async_connection().await?;
     info!("Redis connected successfully");
 
+    info!("Initializing email service");
+    let email_service = Arc::new(EmailService::new(
+        config.smtp_host.clone(),
+        config.smtp_port,
+        config.smtp_username.clone(),
+        config.smtp_password.clone(),
+        config.from_email.clone(),
+        config.base_url.clone(),
+    )?);
+    info!("Email service initialized");
+
     // Create NATS client
     info!("Connecting to NATS");
     let nats_client = async_nats::connect(&config.nats_url).await?;
@@ -81,6 +94,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState {
         db: db_pool,
         redis: redis_client,
+        email: email_service,
         nats: nats_client,
         http_client,
         config: config.clone(),
