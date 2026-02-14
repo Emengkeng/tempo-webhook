@@ -95,10 +95,10 @@ impl WebSocketManager {
         let block_hash = format!("{:?}", header.hash);
         let timestamp = header.timestamp as i64;
 
-        info!(
-            "[{}] Received block #{} (hash: {})",
-            self.network, block_number, &block_hash[..10]
-        );
+        // info!(
+        //     "[{}] Received block #{} (hash: {})",
+        //     self.network, block_number, &block_hash[..10]
+        // );
 
         processor
             .process_block(block_number, block_hash, timestamp, indexer)

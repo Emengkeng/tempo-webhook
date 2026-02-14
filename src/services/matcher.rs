@@ -20,7 +20,7 @@ pub async fn match_transfer_events(
 ) -> anyhow::Result<Vec<MatchedWebhook>> {
     let events = TransferEvent::get_by_block(pool, block_number).await?;
 
-    info!("[{}] 🔎 Matcher: Found {} events in block #{}", network, events.len(), block_number);
+    // info!("[{}] 🔎 Matcher: Found {} events in block #{}", network, events.len(), block_number);
 
     let mut matched = Vec::new();
 
