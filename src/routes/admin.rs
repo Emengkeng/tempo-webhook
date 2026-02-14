@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
+use crate::{error::{AppError, AppResult}, models::Organization, utils::SessionUser};
 use crate::state::AppState;
 use crate::utils::auth::AuthenticatedUser;
 
@@ -56,12 +56,9 @@ pub struct UpdateCustomQuotaRequest {
 /// Admin-only: Create custom quota for enterprise customer
 pub async fn create_custom_quota(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Json(payload): Json<CreateCustomQuotaRequest>,
 ) -> AppResult<(StatusCode, Json<CustomQuota>)> {
-    // Verify admin access
-    verify_admin_access(&auth)?;
-
     // Verify organization exists
     crate::models::Organization::get_by_id(&state.db, payload.organization_id)
         .await?
@@ -101,13 +98,10 @@ pub async fn create_custom_quota(
 /// Admin-only: Update custom quota
 pub async fn update_custom_quota(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<SessionUser>,
     Path(org_id): Path<Uuid>,
     Json(payload): Json<UpdateCustomQuotaRequest>,
 ) -> AppResult<Json<CustomQuota>> {
-    // Verify admin access
-    verify_admin_access(&auth)?;
-
     // Get existing quota
     let existing = get_custom_quota_by_org(&state.db, org_id)
         .await?
@@ -153,12 +147,9 @@ pub async fn update_custom_quota(
 /// Admin-only: Get custom quota for organization
 pub async fn get_custom_quota(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<SessionUser>,
     Path(org_id): Path<Uuid>,
 ) -> AppResult<Json<CustomQuota>> {
-    // Verify admin access
-    verify_admin_access(&auth)?;
-
     let quota = get_custom_quota_by_org(&state.db, org_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Custom quota not found".to_string()))?;
@@ -169,11 +160,8 @@ pub async fn get_custom_quota(
 /// Admin-only: List all custom quotas
 pub async fn list_custom_quotas(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<SessionUser>,
 ) -> AppResult<Json<Vec<CustomQuota>>> {
-    // Verify admin access
-    verify_admin_access(&auth)?;
-
     let quotas = sqlx::query_as!(
         CustomQuota,
         r#"
@@ -195,12 +183,9 @@ pub async fn list_custom_quotas(
 /// Admin-only: Delete custom quota (revert to plan defaults)
 pub async fn delete_custom_quota(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<SessionUser>,
     Path(org_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
-    // Verify admin access
-    verify_admin_access(&auth)?;
-
     sqlx::query!(
         "DELETE FROM custom_quotas WHERE organization_id = $1",
         org_id
@@ -209,6 +194,97 @@ pub async fn delete_custom_quota(
     .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrganizationListItem {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub org_type: String,
+    pub active: bool,
+    pub plan_tier: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub user_count: i64,
+    pub subscription_count: i64,
+}
+
+pub async fn list_all_organizations(
+    State(state): State<Arc<AppState>>,
+    Extension(session_user): Extension<SessionUser>,
+) -> AppResult<Json<Vec<OrganizationListItem>>> {
+    let orgs = sqlx::query_as!(
+        OrganizationListItem,
+        r#"
+        SELECT 
+            o.id,
+            o.name,
+            o.slug,
+            o.org_type,
+            o.active,
+            sp.plan_tier,
+            o.created_at,
+            COUNT(DISTINCT u.id) as "user_count!",
+            COUNT(DISTINCT s.id) as "subscription_count!"
+        FROM organizations o
+        LEFT JOIN subscription_plans sp ON sp.organization_id = o.id
+        LEFT JOIN users u ON u.organization_id = o.id AND u.active = true
+        LEFT JOIN subscriptions s ON s.organization_id = o.id AND s.active = true
+        GROUP BY o.id, sp.plan_tier
+        ORDER BY o.created_at DESC
+        "#
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(orgs))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ToggleOrganizationStatusRequest {
+    pub active: bool,
+    pub reason: Option<String>,
+}
+
+/// Activate/deactivate organization
+pub async fn toggle_organization_status(
+    State(state): State<Arc<AppState>>,
+    Extension(session_user): Extension<SessionUser>,
+    Path(org_id): Path<Uuid>,
+    Json(payload): Json<ToggleOrganizationStatusRequest>,
+) -> AppResult<Json<Organization>> {
+    // Don't allow admins to deactivate their own organization
+    if org_id == session_user.organization_id && !payload.active {
+        return Err(AppError::BadRequest(
+            "Cannot deactivate your own organization".to_string(),
+        ));
+    }
+
+    let org = sqlx::query_as!(
+        Organization,
+        r#"
+        UPDATE organizations
+        SET active = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, name, slug, org_type, owner_id, webhook_secret, 
+                  created_at, active, updated_at
+        "#,
+        org_id,
+        payload.active
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    // TODO: Log admin action
+    // tracing::info!(
+    //     admin_user_id = %session_user.user.id,
+    //     organization_id = %org_id,
+    //     new_status = payload.active,
+    //     reason = ?payload.reason,
+    //     "Organization status changed by admin"
+    // );
+
+    Ok(Json(org))
 }
 
 // Helper functions
@@ -232,21 +308,6 @@ async fn get_custom_quota_by_org(
     )
     .fetch_optional(db)
     .await
-}
-
-fn verify_admin_access(auth: &AuthenticatedUser) -> AppResult<()> {
-    // Check if user has admin role
-    if auth.user.role != "owner" && auth.user.role != "admin" {
-        return Err(AppError::Unauthorized(
-            "Admin access required".to_string(),
-        ));
-    }
-
-    // TODO: Add additional admin verification
-    // might want a separate admin_users table
-    // or check against a list of admin emails/organizations
-
-    Ok(())
 }
 
 /// Public function to get effective limits for an organization

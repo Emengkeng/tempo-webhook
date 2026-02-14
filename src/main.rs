@@ -1,5 +1,6 @@
 use anyhow::Result;
 use sqlx::postgres::PgPoolOptions;
+use tower_sessions_sqlx_store::PostgresStore;
 use std::sync::Arc;
 use tokio::signal;
 use tracing::{info, error};
@@ -56,6 +57,9 @@ async fn main() -> Result<()> {
     
     info!("Database connected successfully");
 
+    let session_store = PostgresStore::new(db_pool.clone());
+    session_store.migrate().await?;
+
     // Run migrations
     info!("Running database migrations");
     sqlx::migrate!("./migrations")
@@ -98,6 +102,7 @@ async fn main() -> Result<()> {
         nats: nats_client,
         http_client,
         config: config.clone(),
+        session_store,
     });
 
     // Start background services

@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use redis::Client as RedisClient;
 use sqlx::PgPool;
+use tower_sessions::SessionStore;
+use tower_sessions_sqlx_store::PostgresStore;
 
 use crate::{config::Config, services::EmailService};
 
@@ -12,4 +14,5 @@ pub struct AppState {
     pub nats: async_nats::Client,
     pub http_client: reqwest::Client,
     pub config: Config,
+    pub session_store: PostgresStore,
 }

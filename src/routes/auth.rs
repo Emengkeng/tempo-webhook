@@ -7,6 +7,7 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
+use tower_sessions::Session;
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
@@ -184,7 +185,7 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     user: UserResponse,
     organization: Organization,
-    api_keys: Vec<ApiKeyListItem>,
+    message: String, 
 }
 
 #[derive(Debug, Serialize)]
@@ -199,6 +200,7 @@ pub struct ApiKeyListItem {
 
 pub async fn login(
     State(state): State<Arc<AppState>>,
+    session: Session,
     Json(payload): Json<LoginRequest>,
 ) -> AppResult<Json<LoginResponse>> {
     // Get user
@@ -233,6 +235,16 @@ pub async fn login(
         })
         .collect();
 
+    session
+        .insert(crate::utils::session_auth::USER_ID_KEY, user.id)
+        .await
+        .map_err(|_| AppError::Internal("Failed to create session".to_string()))?;
+    
+    session
+        .insert(crate::utils::session_auth::ORG_ID_KEY, organization.id)
+        .await
+        .map_err(|_| AppError::Internal("Failed to create session".to_string()))?;
+
     Ok(Json(LoginResponse {
         user: UserResponse {
             id: user.id,
@@ -243,13 +255,32 @@ pub async fn login(
             email_verified: user.email_verified,
         },
         organization,
-        api_keys: api_key_list,
+        message: "Login successful".to_string(),
+    }))
+}
+
+
+#[derive(Debug, Serialize)]
+pub struct LogoutResponse {
+    message: String,
+}
+
+pub async fn logout(
+    session: Session,
+) -> AppResult<Json<LogoutResponse>> {
+    session
+        .flush()
+        .await
+        .map_err(|_| AppError::Internal("Failed to logout".to_string()))?;
+
+    Ok(Json(LogoutResponse {
+        message: "Logged out successfully".to_string(),
     }))
 }
 
 pub async fn create_api_key(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Json(payload): Json<CreateApiKeyRequest>,
 ) -> AppResult<(StatusCode, Json<ApiKeyResponse>)> {
     // Generate API key
@@ -264,8 +295,8 @@ pub async fn create_api_key(
     // Create API key
     let api_key = ApiKey::create(
         &state.db,
-        auth.api_key.organization_id,
-        auth.user.id,
+        session_user.organization_id,
+        session_user.user.id,
         key_hash,
         key_prefix,
         payload.name,
@@ -290,9 +321,9 @@ pub async fn create_api_key(
 
 pub async fn list_api_keys(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
 ) -> AppResult<Json<Vec<ApiKeyListItem>>> {
-    let api_keys = ApiKey::list_by_organization(&state.db, auth.api_key.organization_id).await?;
+    let api_keys = ApiKey::list_by_organization(&state.db, session_user.organization_id).await?;
 
     let list: Vec<ApiKeyListItem> = api_keys
         .into_iter()
@@ -311,10 +342,10 @@ pub async fn list_api_keys(
 
 pub async fn delete_api_key(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Path(id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
-    ApiKey::delete(&state.db, id, auth.api_key.organization_id).await?;
+    ApiKey::delete(&state.db, id, session_user.organization_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -325,9 +356,9 @@ pub struct WebhookSecretResponse {
 
 pub async fn get_webhook_secret(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
 ) -> AppResult<Json<WebhookSecretResponse>> {
-    let org = Organization::get_by_id(&state.db, auth.api_key.organization_id)
+    let org = Organization::get_by_id(&state.db, session_user.organization_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Organization not found".to_string()))?;
 

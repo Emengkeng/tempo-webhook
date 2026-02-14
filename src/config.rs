@@ -45,6 +45,7 @@ pub struct Config {
     // Security
     pub jwt_secret: String,
     pub api_key_encryption_key: String,
+    pub session_secret: String, 
 
     // Polar (billing)
     pub polar_secret_key: String,
@@ -104,6 +105,7 @@ impl Config {
             host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             jwt_secret: env::var("JWT_SECRET")?,
             api_key_encryption_key: env::var("API_KEY_ENCRYPTION_KEY")?,
+            session_secret: env::var("SESSION_SECRET")?,
             polar_secret_key: env::var("POLAR_SECRET_KEY")?,
             polar_webhook_secret: env::var("POLAR_WEBHOOK_SECRET")?,
             sentry_dsn: env::var("SENTRY_DSN").ok(),

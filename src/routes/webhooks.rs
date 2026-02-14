@@ -36,7 +36,7 @@ pub struct WebhookLogsResponse {
 
 pub async fn list_webhook_logs(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Query(query): Query<WebhookLogsQuery>,
 ) -> AppResult<Json<WebhookLogsResponse>> {
     let limit = query.limit.min(100);
@@ -47,7 +47,7 @@ pub async fn list_webhook_logs(
     } else {
         WebhookLog::list_by_organization(
             &state.db,
-            auth.api_key.organization_id,
+            session_user.organization_id,
             limit,
             offset,
         )
@@ -104,7 +104,7 @@ pub struct Quota {
 
 pub async fn get_usage_stats(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Query(query): Query<UsageStatsQuery>,
 ) -> AppResult<Json<UsageStatsResponse>> {
     // Parse dates or use current month
@@ -125,7 +125,7 @@ pub async fn get_usage_stats(
     // Get subscription plan
     let plan = crate::models::SubscriptionPlan::get_by_organization(
         &state.db,
-        auth.api_key.organization_id,
+        session_user.organization_id,
     )
     .await?;
 
@@ -142,7 +142,7 @@ pub async fn get_usage_stats(
         WHERE organization_id = $1
         AND usage_date BETWEEN $2 AND $3
         "#,
-        auth.api_key.organization_id,
+        session_user.organization_id,
         start_date,
         end_date
     )

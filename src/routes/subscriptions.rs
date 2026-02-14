@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
+use tower_sessions::Session;
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
@@ -38,7 +39,7 @@ pub struct ListResponse<T> {
 
 pub async fn create_subscription(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,    
     Json(payload): Json<CreateSubscriptionRequest>,
 ) -> AppResult<(StatusCode, Json<SubscriptionResponse>)> {
     // Validate inputs
@@ -50,7 +51,7 @@ pub async fn create_subscription(
     // Check subscription quota BEFORE creating
     crate::services::quota::check_subscription_quota(
         &state.db,
-        auth.api_key.organization_id,
+        session_user.organization_id,
         &payload.network,
     )
     .await?;
@@ -61,7 +62,7 @@ pub async fn create_subscription(
         crate::services::quota::check_filter_quota(
             filters.len(),
             &state.db,
-            auth.api_key.organization_id,
+            session_user.organization_id,
         )
         .await?;
 
@@ -87,8 +88,8 @@ pub async fn create_subscription(
     // Create subscription
     let subscription = Subscription::create(
         &state.db,
-        auth.api_key.organization_id,
-        auth.user.id,
+        session_user.organization_id,
+        session_user.user.id,
         payload.network,
         payload.event_type,
         payload.address,
@@ -121,7 +122,7 @@ pub async fn create_subscription(
 
 pub async fn list_subscriptions(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<ListResponse<SubscriptionResponse>>> {
     let limit = query.limit.min(100);
@@ -129,7 +130,7 @@ pub async fn list_subscriptions(
 
     let subscriptions = Subscription::list_by_organization(
         &state.db,
-        auth.api_key.organization_id,
+        session_user.organization_id,
         limit,
         offset,
     )
@@ -165,10 +166,10 @@ pub async fn list_subscriptions(
 
 pub async fn get_subscription(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<SubscriptionResponse>> {
-    let subscription = Subscription::get_by_id(&state.db, id, auth.api_key.organization_id)
+    let subscription = Subscription::get_by_id(&state.db, id, session_user.organization_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Subscription not found".to_string()))?;
 
@@ -189,22 +190,22 @@ pub async fn get_subscription(
 
 pub async fn update_subscription(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateSubscriptionRequest>,
 ) -> AppResult<Json<SubscriptionResponse>> {
     // Verify subscription exists and belongs to organization
-    let subscription = Subscription::get_by_id(&state.db, id, auth.api_key.organization_id)
+    let subscription = Subscription::get_by_id(&state.db, id, session_user.organization_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Subscription not found".to_string()))?;
 
     // Update active status if provided
     if let Some(active) = payload.active {
-        Subscription::update_status(&state.db, id, auth.api_key.organization_id, active).await?;
+        Subscription::update_status(&state.db, id, session_user.organization_id, active).await?;
     }
 
     // Fetch updated subscription
-    let updated = Subscription::get_by_id(&state.db, id, auth.api_key.organization_id)
+    let updated = Subscription::get_by_id(&state.db, id, session_user.organization_id)
         .await?
         .unwrap();
 
@@ -225,15 +226,15 @@ pub async fn update_subscription(
 
 pub async fn delete_subscription(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
     Path(id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
     // Verify subscription exists
-    Subscription::get_by_id(&state.db, id, auth.api_key.organization_id)
+    Subscription::get_by_id(&state.db, id, session_user.organization_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Subscription not found".to_string()))?;
 
-    Subscription::delete(&state.db, id, auth.api_key.organization_id).await?;
+    Subscription::delete(&state.db, id, session_user.organization_id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

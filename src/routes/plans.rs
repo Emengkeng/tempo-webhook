@@ -55,14 +55,14 @@ pub struct PlanOption {
 
 pub async fn get_plan_info(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
 ) -> AppResult<Json<PlanInfoResponse>> {
     // Get current plan
-    let plan = SubscriptionPlan::get_by_organization(&state.db, auth.api_key.organization_id)
+    let plan = SubscriptionPlan::get_by_organization(&state.db, session_user.organization_id)
         .await?
         .unwrap_or_else(|| SubscriptionPlan {
             id: uuid::Uuid::new_v4(),
-            organization_id: auth.api_key.organization_id,
+            organization_id: session_user.organization_id,
             plan_tier: "free".to_string(),
             billing_cycle: None,
             price_usd: None,
@@ -78,7 +78,7 @@ pub async fn get_plan_info(
     // Get current usage
     let active_subscriptions = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM subscriptions WHERE organization_id = $1 AND active = true",
-        auth.api_key.organization_id
+        session_user.organization_id
     )
     .fetch_one(&state.db)
     .await?
@@ -96,7 +96,7 @@ pub async fn get_plan_info(
         AND first_attempt >= $2
         AND billable = true
         "#,
-        auth.api_key.organization_id,
+        session_user.organization_id,
         period_start
     )
     .fetch_one(&state.db)
@@ -104,7 +104,7 @@ pub async fn get_plan_info(
     .unwrap_or(0);
 
     // Check API rate limit usage
-    let api_requests = check_current_api_usage(&state, auth.api_key.organization_id).await?;
+    let api_requests = check_current_api_usage(&state, session_user.organization_id).await?;
 
     // Build available plans
     let available_plans = vec![
@@ -243,13 +243,13 @@ pub struct QuotaWarning {
 
 pub async fn check_quota_warnings(
     State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AuthenticatedUser>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
 ) -> AppResult<Json<Vec<QuotaWarning>>> {
-    let plan = SubscriptionPlan::get_by_organization(&state.db, auth.api_key.organization_id)
+    let plan = SubscriptionPlan::get_by_organization(&state.db, session_user.organization_id)
         .await?
         .unwrap_or_else(|| SubscriptionPlan {
             id: uuid::Uuid::new_v4(),
-            organization_id: auth.api_key.organization_id,
+            organization_id: session_user.organization_id,
             plan_tier: "free".to_string(),
             billing_cycle: None,
             price_usd: None,
@@ -266,7 +266,7 @@ pub async fn check_quota_warnings(
     // Check subscription quota
     let active_subs = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM subscriptions WHERE organization_id = $1 AND active = true",
-        auth.api_key.organization_id
+        session_user.organization_id
     )
     .fetch_one(&state.db)
     .await?
@@ -299,7 +299,7 @@ pub async fn check_quota_warnings(
         AND first_attempt >= $2
         AND billable = true
         "#,
-        auth.api_key.organization_id,
+        session_user.organization_id,
         period_start
     )
     .fetch_one(&state.db)

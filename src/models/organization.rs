@@ -13,6 +13,7 @@ pub struct Organization {
     pub webhook_secret: String,
     pub created_at: DateTime<Utc>,
     pub active: bool,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -83,7 +84,7 @@ impl Organization {
             r#"
             INSERT INTO organizations (name, slug, org_type, owner_id, webhook_secret)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
+            RETURNING id, name, slug, org_type, owner_id, webhook_secret, created_at, active, updated_at
             "#,
             name,
             slug,
@@ -98,7 +99,7 @@ impl Organization {
     pub async fn get_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Organization,
-            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active FROM organizations WHERE id = $1 AND active = true",
+            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active, updated_at FROM organizations WHERE id = $1 AND active = true",
             id
         )
         .fetch_optional(pool)
@@ -111,7 +112,7 @@ impl Organization {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Organization,
-            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active FROM organizations WHERE slug = $1 AND active = true",
+            "SELECT id, name, slug, org_type, owner_id, webhook_secret, created_at, active, updated_at FROM organizations WHERE slug = $1 AND active = true",
             slug
         )
         .fetch_optional(pool)

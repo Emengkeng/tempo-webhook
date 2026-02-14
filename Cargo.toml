@@ -77,5 +77,10 @@ url = "2.5.8"
 # Email
 lettre = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "smtp-transport", "builder"] }
 
+# Cookies
+tower-sessions = "0.12"
+tower-sessions-sqlx-store = { version = "0.12", features = ["postgres"] }
+argon2 = "0.5"
+
 [dev-dependencies]
 tokio-test = "0.4"
