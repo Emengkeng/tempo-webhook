@@ -414,3 +414,44 @@ pub async fn verify_email(
         // },
     }))
 }
+
+
+#[derive(Debug, Serialize)]
+pub struct MeResponse {
+    user: UserResponse,
+    organization: OrganizationResponse,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrganizationResponse {
+    id: Uuid,
+    name: String,
+    slug: String,
+    org_type: String,
+}
+
+pub async fn me(
+    State(state): State<Arc<AppState>>,
+    Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
+) -> AppResult<Json<MeResponse>> {
+    let organization = Organization::get_by_id(&state.db, session_user.organization_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Organization not found".to_string()))?;
+
+    Ok(Json(MeResponse {
+        user: UserResponse {
+            id: session_user.user.id,
+            email: session_user.user.email,
+            full_name: session_user.user.full_name,
+            role: session_user.user.role,
+            created_at: session_user.user.created_at,
+            email_verified: session_user.user.email_verified,
+        },
+        organization: OrganizationResponse {
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+            org_type: organization.org_type,
+        },
+    }))
+}

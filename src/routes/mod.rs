@@ -78,6 +78,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // Dashboard routes (strict CORS with credentials)
     let dashboard_routes = Router::new()
         .route("/auth/logout", post(auth::logout))
+        .route("/auth/me", get(auth::me))
         .route("/api-keys", get(auth::list_api_keys).post(auth::create_api_key))
         .route("/api-keys/:id", delete(auth::delete_api_key))
         .route("/webhook-secret", get(auth::get_webhook_secret))
