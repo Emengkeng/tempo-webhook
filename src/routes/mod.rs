@@ -19,19 +19,59 @@ use crate::state::AppState;
 pub fn create_router(state: Arc<AppState>) -> Router {
     // Session layer for web routes
     let session_layer = SessionManagerLayer::new(state.session_store.clone())
-        .with_expiry(Expiry::OnInactivity(Duration::new(60 * 60 * 24 * 7, 0))) // 7 days
-        .with_secure(false) // Set to true in production with HTTPS
+        .with_expiry(Expiry::OnInactivity(Duration::new(60 * 60 * 24 * 7,0)))
+        .with_secure(false)
         .with_same_site(tower_sessions::cookie::SameSite::Lax);
 
-    // Public routes
+    // CORS for dashboard (strict - only allowed origins)
+    let dashboard_cors = {
+        let allowed_origins: Vec<HeaderValue> = state
+            .config
+            .allowed_origins
+            .iter()
+            .filter_map(|origin| origin.parse().ok())
+            .collect();
+
+        CorsLayer::new()
+            .allow_origin(
+                if cfg!(debug_assertions) && allowed_origins.is_empty() {
+                    AllowOrigin::any()
+                } else {
+                    AllowOrigin::list(allowed_origins)
+                }
+            )
+            .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::PUT])
+            .allow_headers([
+                axum::http::header::CONTENT_TYPE,
+                axum::http::header::AUTHORIZATION,
+                axum::http::header::ACCEPT,
+            ])
+            .allow_credentials(true)
+    };
+
+    // CORS for API (permissive - any origin with API key)
+    let api_cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::any())
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::PUT])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::ACCEPT,
+            "X-API-Key".parse::<axum::http::header::HeaderName>().unwrap(),
+        ])
+        .allow_credentials(false); // No credentials for API routes
+
+    // Public routes (permissive CORS)
     let public_routes = Router::new()
         .route("/health", get(health::health_check))
         .route("/webhooks/polar", post(polar_webhooks::handle_polar_webhook))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
-        .route("/auth/verify-email", post(auth::verify_email));
+        .route("/auth/verify-email", post(auth::verify_email))
+        .layer(session_layer.clone())
+        .layer(api_cors.clone());
 
-    // Dashboard routes (session auth)
+    // Dashboard routes (strict CORS with credentials)
     let dashboard_routes = Router::new()
         .route("/auth/logout", post(auth::logout))
         .route("/api-keys", get(auth::list_api_keys).post(auth::create_api_key))
@@ -49,9 +89,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             state.clone(),
             crate::utils::session_auth::authenticate_session,
         ))
-        .layer(session_layer.clone());
+        .layer(session_layer.clone())
+        .layer(dashboard_cors.clone());
 
-    // Admin routes (session auth + admin role check)
+    // Admin routes (strict CORS with credentials)
     let admin_routes = Router::new()
         .route("/admin/custom-quotas", 
             get(admin::list_custom_quotas)
@@ -64,61 +105,33 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/admin/organizations/:id/status", patch(admin::toggle_organization_status))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            crate::utils::admin_auth::require_admin,
-        ))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
             crate::utils::session_auth::authenticate_session,
         ))
-        .layer(session_layer.clone());
+        .layer(session_layer)
+        .layer(dashboard_cors.clone());
 
-    // API routes (API key auth)
+    // API routes (permissive CORS, API key auth)
     let api_routes = Router::new()
-        .route("/api/v1/subscriptions", post(subscriptions::create_subscription))
-        .route("/api/v1/subscriptions/:id", get(subscriptions::get_subscription))
+        .route("/api/v1/subscriptions", 
+            get(subscriptions::list_subscriptions)
+            .post(subscriptions::create_subscription))
+        .route("/api/v1/subscriptions/:id", 
+            get(subscriptions::get_subscription)
+            .patch(subscriptions::update_subscription)
+            .delete(subscriptions::delete_subscription))
+        .route("/api/v1/webhooks/logs", get(webhooks::list_webhook_logs))
+        .route("/api/v1/usage", get(webhooks::get_usage_stats))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::utils::auth::authenticate_api_key_with_state,
-        ));
+        ))
+        .layer(api_cors);
 
-    let allowed_origins: Vec<HeaderValue> = state
-        .config
-        .allowed_origins
-        .iter()
-        .filter_map(|origin| origin.parse().ok())
-        .collect();
-    
-    // Combine routes
+    // Combine routes (NO global CORS layer)
     Router::new()
         .merge(public_routes)
         .merge(dashboard_routes)
         .merge(admin_routes)
         .merge(api_routes)
-        .layer(
-            CorsLayer::new()
-                .allow_origin(
-                    if cfg!(debug_assertions) && allowed_origins.is_empty() {
-                        // Development mode with no explicit origins
-                        AllowOrigin::any()
-                    } else {
-                        // Production or explicit origins set
-                        AllowOrigin::list(allowed_origins)
-                    }
-                )
-                .allow_methods([
-                    Method::GET, 
-                    Method::POST, 
-                    Method::PATCH, 
-                    Method::DELETE, 
-                    Method::PUT
-                ])
-                .allow_headers([
-                    axum::http::header::CONTENT_TYPE,
-                    axum::http::header::AUTHORIZATION,
-                    axum::http::header::ACCEPT,
-                    "X-API-Key".parse().unwrap(),
-                ])
-                .allow_credentials(true),
-        )
         .with_state(state)
 }
