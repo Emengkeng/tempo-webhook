@@ -284,8 +284,7 @@ pub async fn create_api_key(
     Json(payload): Json<CreateApiKeyRequest>,
 ) -> AppResult<(StatusCode, Json<ApiKeyResponse>)> {
     // Generate API key
-    let (api_key_str, key_hash) = generate_api_key("sdk_live");
-    let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
+    let (api_key_str, key_hash, key_prefix) = generate_api_key("sdk_live");
 
     // Calculate expiration
     let expires_at = payload.expires_in_days.map(|days| {
@@ -388,8 +387,7 @@ pub async fn verify_email(
         .ok_or_else(|| AppError::BadRequest("Invalid or expired verification token".to_string()))?;
 
     // Create default API key after email verification
-    let (api_key_str, key_hash) = generate_api_key("sdk_live");
-    let key_prefix = api_key_str.split('_').take(3).collect::<Vec<_>>().join("_");
+    let (api_key_str, key_hash, key_prefix) = generate_api_key("sdk_live");
 
     let api_key = ApiKey::create(
         &state.db,

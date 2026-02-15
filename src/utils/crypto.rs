@@ -69,11 +69,12 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
 }
 
 /// Generate a random API key
-pub fn generate_api_key(prefix: &str) -> (String, String) {
+/// Returns: (full_key, key_hash, key_prefix)
+pub fn generate_api_key(prefix: &str) -> (String, String, String) {
     let random_bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen()).collect();
     let key = format!("{}_{}", prefix, hex::encode(random_bytes));
     let hash = hash_api_key(&key);
-    (key, hash)
+    (key, hash, prefix.to_string())
 }
 
 /// Hash an API key for storage
@@ -140,9 +141,10 @@ mod tests {
 
     #[test]
     fn test_generate_api_key() {
-        let (key, hash) = generate_api_key("tempo_live");
+        let (key, hash, prefix) = generate_api_key("tempo_live");
         
         assert!(key.starts_with("tempo_live_"));
+        assert_eq!(prefix, "tempo_live");
         assert_eq!(hash.len(), 64); // SHA256 hex = 64 chars
         
         // Verify hash matches
