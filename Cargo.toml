@@ -18,7 +18,7 @@ futures = "0.3"
 futures-util = "0.3"
 
 # Database
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json", "bigdecimal", "tls-rustls"] }
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "uuid", "chrono", "json", "bigdecimal"] }
 
 # Redis
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }

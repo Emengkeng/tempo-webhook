@@ -20,8 +20,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // Session layer for web routes
     let session_layer = SessionManagerLayer::new(state.session_store.clone())
         .with_expiry(Expiry::OnInactivity(Duration::new(60 * 60 * 24 * 7,0)))
-        .with_secure(false)
-        .with_same_site(tower_sessions::cookie::SameSite::Lax);
+        .with_secure(true) // Set to true in production (requires HTTPS)
+        .with_same_site(tower_sessions::cookie::SameSite::None) // Set to lax in the future
+        .with_domain(".eventop.xyz".to_string());
 
     // CORS for dashboard (strict - only allowed origins)
     let dashboard_cors = {
@@ -67,8 +68,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/auth/verify-email", post(auth::verify_email))
-        .layer(session_layer.clone())
-        .layer(dashboard_cors.clone());
+        .layer(dashboard_cors.clone()) 
+        .layer(session_layer.clone());
+        
 
     // Webhook callback routes (permissive)
     let webhook_callback_routes = Router::new()
@@ -94,8 +96,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             state.clone(),
             crate::utils::session_auth::authenticate_session,
         ))
-        .layer(session_layer.clone())
-        .layer(dashboard_cors.clone());
+        .layer(dashboard_cors.clone())
+        .layer(session_layer.clone());
+        
 
     // Admin routes (strict CORS with credentials)
     let admin_routes = Router::new()
@@ -112,8 +115,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             state.clone(),
             crate::utils::session_auth::authenticate_session,
         ))
-        .layer(session_layer)
-        .layer(dashboard_cors.clone());
+        .layer(dashboard_cors.clone())
+        .layer(session_layer);
+        
 
     // API routes (permissive CORS, API key auth)
     let api_routes = Router::new()
