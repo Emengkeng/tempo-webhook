@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            id, organization_id, max_subscriptions, max_webhook_deliveries,\n            max_api_requests_per_minute, can_use_mainnet, can_use_testnet,\n            max_filters_per_subscription, custom_features, notes,\n            created_at, updated_at\n        FROM custom_quotas\n        WHERE organization_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "organization_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "max_subscriptions",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "max_webhook_deliveries",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "max_api_requests_per_minute",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "can_use_mainnet",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "can_use_testnet",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "max_filters_per_subscription",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "custom_features",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "0e19c4d239e621c32b84439e306100e650d82e7242138cfbab29c03e21f551fa"
+}

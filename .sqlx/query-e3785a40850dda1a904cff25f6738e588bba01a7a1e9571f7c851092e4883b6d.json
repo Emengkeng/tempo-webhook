@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO subscription_plans (organization_id, plan_tier, status, polar_subscription_id)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (organization_id) \n            DO UPDATE SET \n                plan_tier = EXCLUDED.plan_tier,\n                status = EXCLUDED.status,\n                polar_subscription_id = EXCLUDED.polar_subscription_id\n            RETURNING \n                id,\n                organization_id,\n                plan_tier,\n                billing_cycle,\n                price_usd,\n                status,\n                current_period_start,\n                current_period_end,\n                polar_subscription_id,\n                created_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "organization_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "plan_tier",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "billing_cycle",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "price_usd",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "current_period_start",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "current_period_end",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "polar_subscription_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "e3785a40850dda1a904cff25f6738e588bba01a7a1e9571f7c851092e4883b6d"
+}

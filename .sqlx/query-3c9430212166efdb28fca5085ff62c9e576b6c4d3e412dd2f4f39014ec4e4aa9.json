@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) \n        FROM webhook_logs \n        WHERE organization_id = $1 \n        AND first_attempt >= $2\n        AND billable = true\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3c9430212166efdb28fca5085ff62c9e576b6c4d3e412dd2f4f39014ec4e4aa9"
+}

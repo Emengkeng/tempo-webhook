@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE webhook_logs \n            SET \n                status = $2,\n                http_status_code = $3,\n                error_message = $4,\n                last_attempt = NOW(),\n                attempt_count = attempt_count + 1,\n                latency_ms = $5,\n                delivered_at = CASE WHEN $2 = 'delivered' THEN NOW() ELSE delivered_at END\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c1328492ecaf0c9e30bacc6d2b842a1a9dbc8dcfe724fe6d28f45688f7a1e71"
+}

@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            id, organization_id, plan_tier, billing_cycle, price_usd,\n            status, current_period_start, current_period_end,\n            polar_subscription_id, created_at\n        FROM subscription_plans\n        WHERE polar_subscription_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "organization_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "plan_tier",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "billing_cycle",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "price_usd",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "current_period_start",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "current_period_end",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "polar_subscription_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "bcee4df68b0d20d89c7082df69f17bc40dd9e87c74919f20b0e83978d5dc90d4"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT address \n            FROM subscriptions \n            WHERE active = true \n            AND network = $1\n            AND type IN ('TRANSFER', 'TRANSFER_WITH_MEMO')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "address",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "56ada9d20d9947caa3b35891b76c3695d68007ab8af15c88f04c0529e2e8e9a9"
+}

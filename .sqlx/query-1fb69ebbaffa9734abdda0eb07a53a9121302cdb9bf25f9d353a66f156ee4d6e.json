@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM transfer_events WHERE block_number = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1fb69ebbaffa9734abdda0eb07a53a9121302cdb9bf25f9d353a66f156ee4d6e"
+}

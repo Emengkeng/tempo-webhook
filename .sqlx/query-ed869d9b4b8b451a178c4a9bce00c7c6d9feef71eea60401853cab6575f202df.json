@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            o.id,\n            o.name,\n            o.slug,\n            o.org_type,\n            o.active,\n            sp.plan_tier,\n            o.created_at,\n            COUNT(DISTINCT u.id) as \"user_count!\",\n            COUNT(DISTINCT s.id) as \"subscription_count!\"\n        FROM organizations o\n        LEFT JOIN subscription_plans sp ON sp.organization_id = o.id\n        LEFT JOIN users u ON u.organization_id = o.id AND u.active = true\n        LEFT JOIN subscriptions s ON s.organization_id = o.id AND s.active = true\n        GROUP BY o.id, sp.plan_tier\n        ORDER BY o.created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "org_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "plan_tier",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "user_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "subscription_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ed869d9b4b8b451a178c4a9bce00c7c6d9feef71eea60401853cab6575f202df"
+}

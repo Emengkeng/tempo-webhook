@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO transfer_events (\n                block_number, tx_hash, log_index, token_address, \n                from_address, to_address, direction, amount, memo, timestamp\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            ON CONFLICT (tx_hash, log_index) DO NOTHING\n            RETURNING id, block_number, tx_hash, log_index, token_address, \n                      from_address, to_address, direction, amount, memo, timestamp\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "block_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "tx_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "log_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "token_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "from_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "to_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "direction",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "amount",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "memo",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "timestamp",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Int4",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "e915a98349c2aa5c07456ae2234837cf0ecb3e5bd6f13c3f59b0a30ec7629831"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscription_plans SET status = 'cancelled' WHERE polar_subscription_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7610492bb5425017f46821e4267f9ccb2e855dde24ffe58de416a5d843bd40bc"
+}

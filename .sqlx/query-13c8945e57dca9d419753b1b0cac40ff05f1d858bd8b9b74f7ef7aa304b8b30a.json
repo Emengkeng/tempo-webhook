@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO indexed_blocks (block_number, block_hash, timestamp)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (block_number) DO UPDATE\n            SET block_hash = $2, timestamp = $3\n            RETURNING block_number, block_hash, timestamp, processed_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "block_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "block_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "timestamp",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "processed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "13c8945e57dca9d419753b1b0cac40ff05f1d858bd8b9b74f7ef7aa304b8b30a"
+}

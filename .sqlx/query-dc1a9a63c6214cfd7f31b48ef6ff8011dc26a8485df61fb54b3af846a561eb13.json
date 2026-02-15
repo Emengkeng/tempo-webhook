@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE webhook_logs \n            SET status = 'cancelled', error_message = 'Reorg detected'\n            WHERE block_number = $1 AND status IN ('pending', 'retrying')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc1a9a63c6214cfd7f31b48ef6ff8011dc26a8485df61fb54b3af846a561eb13"
+}

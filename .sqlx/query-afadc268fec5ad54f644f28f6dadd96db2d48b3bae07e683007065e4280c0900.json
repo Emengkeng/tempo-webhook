@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO filters (subscription_id, filter_type, filter_value)\n                VALUES ($1, $2, $3)\n                RETURNING id, subscription_id, filter_type, filter_value, active\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "filter_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "filter_value",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "afadc268fec5ad54f644f28f6dadd96db2d48b3bae07e683007065e4280c0900"
+}
