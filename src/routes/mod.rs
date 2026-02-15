@@ -7,12 +7,11 @@ pub mod plans;
 pub mod admin;
 
 use axum::{
-    middleware,
-    routing::{get, post, delete, patch, put},
-    Router,
+    Router, http::HeaderValue, middleware, routing::{delete, get, patch, post, put}
 };
+use reqwest::Method;
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_sessions::{SessionManagerLayer, Expiry, cookie::time::Duration};
 
 use crate::state::AppState;
@@ -82,17 +81,43 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             crate::utils::auth::authenticate_api_key_with_state,
         ));
 
+    let allowed_origins: Vec<HeaderValue> = state
+        .config
+        .allowed_origins
+        .iter()
+        .filter_map(|origin| origin.parse().ok())
+        .collect();
+    
     // Combine routes
     Router::new()
         .merge(public_routes)
         .merge(dashboard_routes)
-        .merge(admin_routes) 
+        .merge(admin_routes)
         .merge(api_routes)
         .layer(
             CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any)
+                .allow_origin(
+                    if cfg!(debug_assertions) && allowed_origins.is_empty() {
+                        // Development mode with no explicit origins
+                        AllowOrigin::any()
+                    } else {
+                        // Production or explicit origins set
+                        AllowOrigin::list(allowed_origins)
+                    }
+                )
+                .allow_methods([
+                    Method::GET, 
+                    Method::POST, 
+                    Method::PATCH, 
+                    Method::DELETE, 
+                    Method::PUT
+                ])
+                .allow_headers([
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::AUTHORIZATION,
+                    axum::http::header::ACCEPT,
+                    "X-API-Key".parse().unwrap(),
+                ])
                 .allow_credentials(true),
         )
         .with_state(state)

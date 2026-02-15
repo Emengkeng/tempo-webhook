@@ -67,6 +67,8 @@ pub struct Config {
     // Rate limiting
     #[serde(default = "default_rate_limit_per_minute")]
     pub rate_limit_per_minute: u32,
+
+    pub allowed_origins: Vec<String>,
 }
 
 impl Config {
@@ -125,6 +127,13 @@ impl Config {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(100),
+
+            allowed_origins: env::var("ALLOWED_ORIGINS")
+                .unwrap_or_else(|_| "http://localhost:3000".to_string())
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
         })
     }
 }
