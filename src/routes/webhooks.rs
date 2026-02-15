@@ -91,7 +91,7 @@ pub struct Period {
 #[derive(Debug, Serialize)]
 pub struct Usage {
     webhook_deliveries: i64,
-    api_requests: i64,
+    api_requests: i32,
     active_subscriptions: i64,
 }
 
