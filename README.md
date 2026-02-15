@@ -28,8 +28,8 @@ Real-time blockchain webhook notification service for Tempo with self-indexing a
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd tempo-webhooks
+git clone https://github.com/Emengkeng/tempo-webhook.git
+cd tempo-webhook
 
 # Copy environment file
 cp .env.example .env
@@ -271,13 +271,3 @@ See `.env.example` for all required environment variables.
 ## 🤝 Contributing
 
 Contributions welcome! Please open an issue or PR.
-
-## 📄 License
-
-MIT
-
-## 🆘 Support
-
-- Documentation: See `/docs` folder
-- Issues: GitHub Issues
-- Email: support@tempohooks.com
