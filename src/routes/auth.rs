@@ -375,7 +375,7 @@ pub struct VerifyEmailRequest {
 #[derive(Debug, Serialize)]
 pub struct VerifyEmailResponse {
     message: String,
-    api_key: ApiKeyResponse,
+    // api_key: ApiKeyResponse,
 }
 
 pub async fn verify_email(
@@ -405,14 +405,14 @@ pub async fn verify_email(
 
     Ok(Json(VerifyEmailResponse {
         message: "Email verified successfully!".to_string(),
-        api_key: ApiKeyResponse {
-            id: api_key.id,
-            key: api_key_str,
-            key_prefix: api_key.key_prefix,
-            name: api_key.name,
-            network: api_key.network,
-            created_at: api_key.created_at,
-            expires_at: api_key.expires_at,
-        },
+        // api_key: ApiKeyResponse {
+        //     id: api_key.id,
+        //     key: api_key_str,
+        //     key_prefix: api_key.key_prefix,
+        //     name: api_key.name,
+        //     network: api_key.network,
+        //     created_at: api_key.created_at,
+        //     expires_at: api_key.expires_at,
+        // },
     }))
 }
