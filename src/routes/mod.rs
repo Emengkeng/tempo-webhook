@@ -40,7 +40,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
                     AllowOrigin::list(allowed_origins)
                 }
             )
-            .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::PUT])
+            .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::PUT, Method::OPTIONS])
             .allow_headers([
                 axum::http::header::CONTENT_TYPE,
                 axum::http::header::AUTHORIZATION,
@@ -64,11 +64,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     // Public routes (permissive CORS)
     let public_routes = Router::new()
         .route("/health", get(health::health_check))
-        .route("/webhooks/polar", post(polar_webhooks::handle_polar_webhook))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/auth/verify-email", post(auth::verify_email))
         .layer(session_layer.clone())
+        .layer(dashboard_cors.clone());
+
+    // Webhook callback routes (permissive)
+    let webhook_callback_routes = Router::new()
+        .route("/webhooks/polar", post(polar_webhooks::handle_polar_webhook))
         .layer(api_cors.clone());
 
     // Dashboard routes (strict CORS with credentials)
@@ -131,6 +135,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(public_routes)
         .merge(dashboard_routes)
+        .merge(webhook_callback_routes)
         .merge(admin_routes)
         .merge(api_routes)
         .with_state(state)
