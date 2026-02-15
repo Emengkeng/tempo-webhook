@@ -245,59 +245,47 @@ pub async fn check_quota_warnings(
     State(state): State<Arc<AppState>>,
     Extension(session_user): Extension<crate::utils::session_auth::SessionUser>,
 ) -> AppResult<Json<Vec<QuotaWarning>>> {
-    let plan = SubscriptionPlan::get_by_organization(&state.db, session_user.organization_id)
-        .await?
-        .unwrap_or_else(|| SubscriptionPlan {
+    let mut warnings = Vec::new();
+
+    // Get plan
+    let plan = crate::models::SubscriptionPlan::get_by_organization(
+        &state.db,
+        session_user.organization_id,
+    )
+    .await?
+    .unwrap_or_else(|| {
+        crate::models::SubscriptionPlan {
             id: uuid::Uuid::new_v4(),
             organization_id: session_user.organization_id,
             plan_tier: "free".to_string(),
             billing_cycle: None,
             price_usd: None,
             status: "active".to_string(),
-            current_period_start: None,
+            current_period_start: Some(chrono::Utc::now()),
             current_period_end: None,
             polar_subscription_id: None,
             created_at: chrono::Utc::now(),
-        });
+        }
+    });
 
-    let limits = PlanLimits::for_tier(&plan.plan_tier);
-    let mut warnings = Vec::new();
-
-    // Check subscription quota
-    let active_subs = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM subscriptions WHERE organization_id = $1 AND active = true",
-        session_user.organization_id
+    let limits = crate::services::quota::PlanLimits::for_organization(
+        &state.db,
+        session_user.organization_id,
+        &plan.plan_tier,
     )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
+    .await?;
 
-    let sub_percentage = (active_subs as f64 / limits.max_subscriptions as f64) * 100.0;
-    if sub_percentage >= 80.0 {
-        warnings.push(QuotaWarning {
-            warning_type: "subscriptions".to_string(),
-            message: format!(
-                "You're using {}% of your subscription quota",
-                sub_percentage as i64
-            ),
-            current_usage: active_subs,
-            limit: limits.max_subscriptions,
-            percentage_used: sub_percentage,
-        });
-    }
+    let period_start = plan.current_period_start.unwrap_or_else(|| chrono::Utc::now());
 
     // Check webhook quota
-    let period_start = plan
-        .current_period_start
-        .unwrap_or_else(|| chrono::Utc::now());
-
-    let webhook_count = sqlx::query_scalar!(
+    let webhook_usage = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) 
         FROM webhook_logs 
         WHERE organization_id = $1 
         AND first_attempt >= $2
         AND billable = true
+        AND status != 'cancelled'
         "#,
         session_user.organization_id,
         period_start
@@ -306,17 +294,42 @@ pub async fn check_quota_warnings(
     .await?
     .unwrap_or(0);
 
-    let webhook_percentage = (webhook_count as f64 / limits.max_webhook_deliveries as f64) * 100.0;
+    let webhook_percentage = (webhook_usage as f64 / limits.max_webhook_deliveries as f64) * 100.0;
+
     if webhook_percentage >= 80.0 {
         warnings.push(QuotaWarning {
             warning_type: "webhooks".to_string(),
             message: format!(
-                "You're using {}% of your monthly webhook quota",
-                webhook_percentage as i64
+                "You're using {:.1}% of your monthly webhook quota",
+                webhook_percentage
             ),
-            current_usage: webhook_count,
+            current_usage: webhook_usage,
             limit: limits.max_webhook_deliveries,
             percentage_used: webhook_percentage,
+        });
+    }
+
+    // Check subscription quota
+    let subscription_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM subscriptions WHERE organization_id = $1 AND active = true",
+        session_user.organization_id
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    let subscription_percentage = (subscription_count as f64 / limits.max_subscriptions as f64) * 100.0;
+
+    if subscription_percentage >= 80.0 {
+        warnings.push(QuotaWarning {
+            warning_type: "subscriptions".to_string(),
+            message: format!(
+                "You're using {:.1}% of your subscription limit",
+                subscription_percentage
+            ),
+            current_usage: subscription_count,
+            limit: limits.max_subscriptions,
+            percentage_used: subscription_percentage,
         });
     }
 

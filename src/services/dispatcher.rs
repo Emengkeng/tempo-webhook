@@ -51,9 +51,59 @@ pub struct WebhookDeliveryJob {
 async fn deliver_webhook(state: Arc<AppState>, job: WebhookDeliveryJob) -> anyhow::Result<()> {
     let start_time = Instant::now();
     
-    // Check webhook quota before delivery
-    if let Err(e) = crate::services::quota::check_webhook_quota(&state.db, job.organization_id).await {
-        tracing::warn!("Webhook quota exceeded for org {}: {}", job.organization_id, e);
+    // Get organization's plan and period
+    let plan = crate::models::SubscriptionPlan::get_by_organization(&state.db, job.organization_id)
+        .await?
+        .unwrap_or_else(|| {
+            crate::models::SubscriptionPlan {
+                id: uuid::Uuid::new_v4(),
+                organization_id: job.organization_id,
+                plan_tier: "free".to_string(),
+                billing_cycle: None,
+                price_usd: None,
+                status: "active".to_string(),
+                current_period_start: Some(chrono::Utc::now()),
+                current_period_end: None,
+                polar_subscription_id: None,
+                created_at: chrono::Utc::now(),
+            }
+        });
+    
+    let period_start = plan.current_period_start.unwrap_or_else(|| chrono::Utc::now());
+    
+    // Count deliveries in current billing period (query webhook_logs directly)
+    let current_usage = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) 
+        FROM webhook_logs 
+        WHERE organization_id = $1 
+        AND first_attempt >= $2
+        AND billable = true
+        AND status != 'cancelled'
+        "#,
+        job.organization_id,
+        period_start
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+    
+    // Get plan limits
+    let limits = crate::services::quota::PlanLimits::for_organization(
+        &state.db,
+        job.organization_id,
+        &plan.plan_tier,
+    )
+    .await?;
+    
+    // Check if quota exceeded
+    if current_usage >= limits.max_webhook_deliveries {
+        tracing::warn!(
+            "Webhook quota exceeded for org {}: {}/{} used",
+            job.organization_id,
+            current_usage,
+            limits.max_webhook_deliveries
+        );
         
         // Mark as failed due to quota
         WebhookLog::update_delivery_status(
@@ -61,7 +111,11 @@ async fn deliver_webhook(state: Arc<AppState>, job: WebhookDeliveryJob) -> anyho
             job.webhook_log_id,
             "failed".to_string(),
             None,
-            Some(format!("Quota exceeded: {}", e)),
+            Some(format!(
+                "Monthly quota exceeded: {}/{} webhook deliveries used",
+                current_usage,
+                limits.max_webhook_deliveries
+            )),
             None,
         )
         .await?;

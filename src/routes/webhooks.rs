@@ -135,16 +135,20 @@ pub async fn get_usage_stats(
     let usage_data = sqlx::query!(
         r#"
         SELECT 
-            COALESCE(SUM(webhook_deliveries), 0) as total_webhooks,
-            COALESCE(SUM(api_requests), 0) as total_api_requests,
-            MAX(active_subscriptions) as max_subscriptions
-        FROM usage_records
-        WHERE organization_id = $1
-        AND usage_date BETWEEN $2 AND $3
+            COUNT(*) FILTER (WHERE billable = true AND status != 'cancelled') as total_webhooks,
+            0 as total_api_requests,
+            (
+                SELECT COUNT(*) 
+                FROM subscriptions 
+                WHERE organization_id = $1 AND active = true
+            ) as max_subscriptions
+        FROM webhook_logs 
+        WHERE organization_id = $1 
+        AND first_attempt BETWEEN $2 AND $3
         "#,
         session_user.organization_id,
-        start_date,
-        end_date
+        start_date.and_hms_opt(0, 0, 0).unwrap().and_utc(),
+        end_date.and_hms_opt(23, 59, 59).unwrap().and_utc()
     )
     .fetch_one(&state.db)
     .await?;

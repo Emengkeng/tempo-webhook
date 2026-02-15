@@ -184,7 +184,7 @@ pub async fn check_webhook_quota(
                 billing_cycle: None,
                 price_usd: None,
                 status: "active".to_string(),
-                current_period_start: None,
+                current_period_start: Some(chrono::Utc::now()),
                 current_period_end: None,
                 polar_subscription_id: None,
                 created_at: chrono::Utc::now(),
@@ -192,13 +192,21 @@ pub async fn check_webhook_quota(
         });
 
     // Get effective limits (includes custom quotas)
-    let limits = crate::routes::admin::get_effective_limits(db, organization_id).await?;
+    let limits = PlanLimits::for_organization(db, organization_id, &plan.plan_tier).await?;
 
-    // Get current period usage
+    // Get current period start (use subscription period or current month)
     let period_start = plan
         .current_period_start
-        .unwrap_or_else(|| chrono::Utc::now());
+        .unwrap_or_else(|| {
+            let now = chrono::Utc::now();
+            chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()
+        });
 
+    // Count webhook deliveries in current period (query webhook_logs directly)
     let current_usage = sqlx::query_scalar!(
         r#"
         SELECT COUNT(*) 
@@ -206,6 +214,7 @@ pub async fn check_webhook_quota(
         WHERE organization_id = $1 
         AND first_attempt >= $2
         AND billable = true
+        AND status != 'cancelled'
         "#,
         organization_id,
         period_start
@@ -216,8 +225,8 @@ pub async fn check_webhook_quota(
 
     if current_usage >= limits.max_webhook_deliveries {
         return Err(AppError::BadRequest(format!(
-            "Webhook delivery quota exceeded. Your {} plan allows {} deliveries per month. Current usage: {}.",
-            plan.plan_tier, limits.max_webhook_deliveries, current_usage
+            "Webhook delivery quota exceeded. Your {} plan allows {} deliveries per month. Current usage: {}/{}. Upgrade your plan to continue receiving webhooks.",
+            plan.plan_tier, limits.max_webhook_deliveries, current_usage, limits.max_webhook_deliveries
         )));
     }
 
